@@ -252,7 +252,12 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const handleAddLead = async () => {
     if (!newLeadForm.name) return onNotify('error', 'O nome é obrigatório.');
     try {
-      const { error } = await supabase.from('leads').insert([{
+      const selectedEvent = newLeadForm.tagId ? events.find(e => e.id === newLeadForm.tagId) : null;
+      const initialValue = selectedEvent?.price && selectedEvent.price > 0
+        ? selectedEvent.price
+        : (Number(newLeadForm.value) || 0);
+
+      const { data, error } = await supabase.from('leads').insert([{
         name: newLeadForm.name,
         company: newLeadForm.company,
         sector: newLeadForm.sector,
@@ -261,9 +266,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         tag_id: newLeadForm.tagId || null,
         owner_id: newLeadForm.ownerId || null,
         stage: LeadStage.NEW_LEAD,
-        value: Number(newLeadForm.value) || 0
-      }]);
+        value: initialValue
+      }]).select();
+
       if (error) throw error;
+
+      const createdLead = data[0];
+
       onNotify('success', 'Lead adicionado!');
       setIsAddModalOpen(false);
       setNewLeadForm({ name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '', ownerId: '' });
