@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, CheckCircle, ChevronLeft, Loader2, User, RefreshCw } from 'lucide-react';
+import { Mail, Lock, ChevronLeft, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -21,17 +21,21 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Matrix Money Effect
+
+  // Check if already logged in
   useEffect(() => {
-    // Check if already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         navigate('/dashboard', { replace: true });
       }
     });
+  }, [navigate]);
 
+  // Matrix Rain Effect
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -41,27 +45,27 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const characters = '$$$€€€£££¥¥¥0101NGHUB';
-    const fontSize = 14;
-    const columns = canvas.width / fontSize;
+    const columns = Math.floor(canvas.width / 20);
+    const drops: number[] = new Array(columns).fill(1);
 
-    const drops: number[] = [];
-    for (let i = 0; i < columns; i++) {
-      drops[i] = 1;
-    }
+    // Matrix characters: mix of katakana and latin
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789$+-*/=%"\'#&_(),.;:?!\\|{}<>[]^~';
 
     const draw = () => {
-      ctx.fillStyle = 'rgba(5, 5, 5, 0.05)';
+      ctx.fillStyle = 'rgba(9, 9, 11, 0.05)'; // #09090b with very low opacity for fade effect
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = '#D4AF37'; // Brand Gold
-      ctx.font = `${fontSize}px monospace`;
+      ctx.font = '15px monospace';
 
       for (let i = 0; i < drops.length; i++) {
-        const text = characters.charAt(Math.floor(Math.random() * characters.length));
-        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        // Randomize opacity for depth
+        ctx.globalAlpha = Math.random() * 0.5 + 0.5;
+        ctx.fillText(text, i * 20, drops[i] * 20);
+        ctx.globalAlpha = 1.0;
 
-        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+        if (drops[i] * 20 > canvas.height && Math.random() > 0.975) {
           drops[i] = 0;
         }
         drops[i]++;
@@ -81,7 +85,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
       clearInterval(interval);
       window.removeEventListener('resize', handleResize);
     };
-  }, [navigate]);
+  }, []);
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,8 +189,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
       {/* Matrix Canvas Background */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 z-0 opacity-40 pointer-events-none"
+        className="absolute inset-0 z-0 opacity-20"
       />
+
 
       {/* Radial Gradient Overlay for focus */}
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-transparent via-brand-dark/80 to-brand-dark pointer-events-none"></div>

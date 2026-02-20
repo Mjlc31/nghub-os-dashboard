@@ -4,6 +4,8 @@ import { ArrowUpRight, ArrowDownRight, Download, Plus, Loader2, FileText, Layout
 import Modal from '../components/ui/Modal';
 import { Transaction } from '../types';
 import { supabase } from '../lib/supabase';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
 
 const Finance: React.FC = () => {
   const [viewMode, setViewMode] = useState<'cashflow' | 'dre'>('cashflow');
@@ -151,12 +153,36 @@ const Finance: React.FC = () => {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nova Transação" footer={<><button onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Cancelar</button><button onClick={handleAddTransaction} className="px-4 py-2 rounded-lg text-sm bg-brand-gold text-black font-semibold hover:bg-[#c5a059] transition-colors">Salvar</button></>}>
         <div className="space-y-4">
-          <div><label className="block text-xs font-medium text-zinc-400 mb-1">Descrição</label><input type="text" className="w-full bg-zinc-950 border border-brand-border rounded-lg px-3 py-2 text-white focus:border-brand-gold focus:outline-none" placeholder="Ex: Mensalidade Cliente X" value={newTrans.description} onChange={(e) => setNewTrans({ ...newTrans, description: e.target.value })} /></div>
+          <Input
+            label="Descrição"
+            placeholder="Ex: Mensalidade Cliente X"
+            value={newTrans.description}
+            onChange={(e) => setNewTrans({ ...newTrans, description: e.target.value })}
+          />
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="block text-xs font-medium text-zinc-400 mb-1">Valor (R$)</label><input type="number" className="w-full bg-zinc-950 border border-brand-border rounded-lg px-3 py-2 text-white focus:border-brand-gold focus:outline-none" placeholder="0.00" value={newTrans.amount} onChange={(e) => setNewTrans({ ...newTrans, amount: e.target.value })} /></div>
-            <div><label className="block text-xs font-medium text-zinc-400 mb-1">Tipo</label><select className="w-full bg-zinc-950 border border-brand-border rounded-lg px-3 py-2 text-white focus:border-brand-gold focus:outline-none" value={newTrans.type} onChange={(e) => setNewTrans({ ...newTrans, type: e.target.value })}><option value="income">Receita (Entrada)</option><option value="expense">Despesa (Saída)</option></select></div>
+            <Input
+              label="Valor (R$)"
+              type="number"
+              placeholder="0.00"
+              value={newTrans.amount}
+              onChange={(e) => setNewTrans({ ...newTrans, amount: e.target.value })}
+            />
+            <Select
+              label="Tipo"
+              value={newTrans.type}
+              onChange={(e) => setNewTrans({ ...newTrans, type: e.target.value })}
+              options={[
+                { value: 'income', label: 'Receita (Entrada)' },
+                { value: 'expense', label: 'Despesa (Saída)' }
+              ]}
+            />
           </div>
-          <div><label className="block text-xs font-medium text-zinc-400 mb-1">Categoria</label><input type="text" className="w-full bg-zinc-950 border border-brand-border rounded-lg px-3 py-2 text-white focus:border-brand-gold focus:outline-none" placeholder="Ex: Vendas, Marketing, Software..." value={newTrans.category} onChange={(e) => setNewTrans({ ...newTrans, category: e.target.value })} /></div>
+          <Input
+            label="Categoria"
+            placeholder="Ex: Vendas, Marketing, Software..."
+            value={newTrans.category}
+            onChange={(e) => setNewTrans({ ...newTrans, category: e.target.value })}
+          />
         </div>
       </Modal>
     </div>
