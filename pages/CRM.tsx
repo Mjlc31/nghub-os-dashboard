@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 import { KanbanColumn } from '../components/crm/KanbanColumn';
 import { LeadFormModal } from '../components/crm/LeadFormModal';
 import { ImportLeadsModal } from '../components/crm/ImportLeadsModal';
+import { Button } from '../components/ui/Button';
 
 interface CRMProps {
   onNotify: (type: 'success' | 'error' | 'info', msg: string) => void;
@@ -278,11 +279,25 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
 
           <div className="flex flex-1 md:flex-none items-center bg-brand-surface border border-zinc-800 rounded-xl p-1 gap-1 w-full md:w-auto mt-2 md:mt-0">
             <div className="relative flex-1 md:w-64">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-transparent border-none text-sm pl-9 pr-4 py-2 text-zinc-200 focus:ring-0 placeholder-zinc-600" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 z-10" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-transparent border-none text-sm pl-9 pr-4 py-2 text-zinc-200 focus:ring-0 placeholder-zinc-600 h-10"
+              />
             </div>
             {/* Desktop Only Button */}
-            <button onClick={() => setIsAddModalOpen(true)} className="hidden md:flex bg-brand-gold text-black font-bold px-4 py-2 rounded-lg text-xs items-center gap-2 whitespace-nowrap"><Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Novo Lead</span></button>
+            <Button
+              onClick={() => setIsAddModalOpen(true)}
+              variant="primary"
+              size="sm"
+              className="hidden md:flex ml-2 whitespace-nowrap"
+              icon={<Plus className="w-3.5 h-3.5" />}
+            >
+              Novo Lead
+            </Button>
           </div>
         </div>
       </div>

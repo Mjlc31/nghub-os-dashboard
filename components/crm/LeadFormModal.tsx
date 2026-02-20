@@ -1,7 +1,9 @@
 import React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, User, Building, Briefcase, Mail, Phone, DollarSign } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { Event } from '../../types';
+import { Input } from '../ui/Input';
+import { Button } from '../ui/Button';
 
 interface LeadFormState {
     name: string;
@@ -37,59 +39,39 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             title="Novo Lead"
             footer={
                 <>
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white"
-                    >
+                    <Button variant="ghost" onClick={onClose}>
                         Cancelar
-                    </button>
-                    <button
-                        onClick={onSave}
-                        className="px-4 py-2 rounded-lg text-sm bg-brand-gold text-black font-bold hover:bg-[#c5a059] transition-colors"
-                    >
+                    </Button>
+                    <Button variant="primary" onClick={onSave}>
                         Salvar
-                    </button>
+                    </Button>
                 </>
             }
         >
             <div className="space-y-4">
-                <div>
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">
-                        Nome Completo
-                    </label>
-                    <input
-                        type="text"
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-white focus:border-brand-gold focus:outline-none text-sm"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                <Input
+                    label="Nome Completo"
+                    icon={<User className="w-4 h-4" />}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                    <Input
+                        label="Empresa"
+                        icon={<Building className="w-4 h-4" />}
+                        value={formData.company}
+                        onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                    />
+                    <Input
+                        label="Setor"
+                        icon={<Briefcase className="w-4 h-4" />}
+                        value={formData.sector}
+                        onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
                     />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">
-                            Empresa
-                        </label>
-                        <input
-                            type="text"
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-white focus:border-brand-gold focus:outline-none text-sm"
-                            value={formData.company}
-                            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">
-                            Setor
-                        </label>
-                        <input
-                            type="text"
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-white focus:border-brand-gold focus:outline-none text-sm"
-                            value={formData.sector}
-                            onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
-                        />
-                    </div>
-                </div>
 
-                {/* Tag Selection in Modal */}
+                {/* Tag Selection in Modal (Select Manual mantido por enquanto) */}
                 <div>
                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">
                         Etiqueta (Evento)
@@ -98,7 +80,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                         <select
                             value={formData.tagId}
                             onChange={(e) => setFormData({ ...formData, tagId: e.target.value })}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-white focus:border-brand-gold focus:outline-none text-sm appearance-none"
+                            className="w-full bg-brand-dark border border-brand-border rounded-lg p-3 text-zinc-200 focus:border-brand-gold focus:outline-none focus:ring-1 focus:ring-brand-gold/20 text-sm appearance-none shadow-inner transition-all"
                         >
                             <option value="">Sem etiqueta</option>
                             {events.map((ev) => (
@@ -111,42 +93,31 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                     </div>
                 </div>
 
-                <div>
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">
-                        Valor Potencial (R$)
-                    </label>
-                    <input
-                        type="number"
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-white focus:border-brand-gold focus:outline-none text-sm font-mono"
-                        value={formData.value}
-                        onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-                        placeholder="0.00"
-                    />
-                </div>
+                <Input
+                    label="Valor Potencial (R$)"
+                    type="number"
+                    icon={<DollarSign className="w-4 h-4" />}
+                    value={formData.value}
+                    onChange={(e) => setFormData({ ...formData, value: e.target.value })}
+                    placeholder="0.00"
+                    className="font-mono"
+                />
 
                 <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">
-                            Email
-                        </label>
-                        <input
-                            type="email"
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-white focus:border-brand-gold focus:outline-none text-sm"
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">
-                            WhatsApp
-                        </label>
-                        <input
-                            type="tel"
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-white focus:border-brand-gold focus:outline-none text-sm"
-                            value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        />
-                    </div>
+                    <Input
+                        label="Email"
+                        type="email"
+                        icon={<Mail className="w-4 h-4" />}
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    />
+                    <Input
+                        label="WhatsApp"
+                        type="tel"
+                        icon={<Phone className="w-4 h-4" />}
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
                 </div>
             </div>
         </Modal>

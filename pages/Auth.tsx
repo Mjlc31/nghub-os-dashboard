@@ -1,18 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, CheckCircle, ChevronLeft, Loader2, User } from 'lucide-react';
+import { Mail, Lock, ArrowRight, CheckCircle, ChevronLeft, Loader2, User, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 
 interface AuthProps {
   onLogin: () => void;
-  onNotify: (type: 'success' | 'error', msg: string) => void;
+  onNotify: (type: 'success' | 'error' | 'info', msg: string) => void;
 }
 
 const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
   const navigate = useNavigate();
   const [view, setView] = useState<'login' | 'forgot' | 'signup'>('login');
 
-  // ... state declarations ...
+  // State Declarations
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Matrix Money Effect
   useEffect(() => {
@@ -23,10 +32,56 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
       }
     });
 
-    // ... canvas logic ...
-  }, [navigate]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  // ... canvas rendering ...
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const characters = '$$$€€€£££¥¥¥0101NGHUB';
+    const fontSize = 14;
+    const columns = canvas.width / fontSize;
+
+    const drops: number[] = [];
+    for (let i = 0; i < columns; i++) {
+      drops[i] = 1;
+    }
+
+    const draw = () => {
+      ctx.fillStyle = 'rgba(5, 5, 5, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#D4AF37'; // Brand Gold
+      ctx.font = `${fontSize}px monospace`;
+
+      for (let i = 0; i < drops.length; i++) {
+        const text = characters.charAt(Math.floor(Math.random() * characters.length));
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+    };
+
+    const interval = setInterval(draw, 33);
+
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +110,15 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
   };
 
   const handleSignup = async (e: React.FormEvent) => {
-    // ... validation ...
+    e.preventDefault();
+    if (!email || !password || !name) {
+      onNotify('error', 'Preencha todos os campos.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      onNotify('error', 'As senhas não coincidem.');
+      return;
+    }
 
     setLoading(true);
 
@@ -81,8 +144,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
         onNotify('success', 'Cadastro realizado! Verifique seu email para ativar a conta.');
         setView('login');
       }
-
-      // ... reset form ...
 
       // Reset form
       setName('');
@@ -151,34 +212,24 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
               </div>
 
               <div className="space-y-5">
-                <div className="group">
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-2 group-focus-within:text-brand-gold transition-colors">E-mail</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-brand-gold transition-colors" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-brand-dark border border-brand-border rounded-lg py-3.5 pl-10 pr-4 text-zinc-200 text-sm focus:outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20 transition-all placeholder-zinc-700 shadow-inner"
-                      placeholder="seu@email.com"
-                    />
-                  </div>
-                </div>
+                <Input
+                  label="E-mail"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  icon={<Mail className="w-4 h-4" />}
+                />
 
-                <div className="group">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-[10px] uppercase tracking-wider text-zinc-500 font-bold group-focus-within:text-brand-gold transition-colors">Senha</label>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-brand-gold transition-colors" />
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-brand-dark border border-brand-border rounded-lg py-3.5 pl-10 pr-4 text-zinc-200 text-sm focus:outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20 transition-all placeholder-zinc-700 shadow-inner"
-                      placeholder="••••••••"
-                    />
-                  </div>
+                <div>
+                  <Input
+                    label="Senha"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    icon={<Lock className="w-4 h-4" />}
+                  />
                   <div className="text-right mt-2">
                     <button
                       type="button"
@@ -191,13 +242,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
                 </div>
               </div>
 
-              <button
+              <Button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-brand-gold text-black font-bold py-4 rounded-lg hover:bg-[#E5C158] transition-all flex items-center justify-center gap-2 mt-4 shadow-[0_4px_20px_rgba(212,175,55,0.15)] hover:shadow-[0_4px_30px_rgba(212,175,55,0.3)] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
+                variant="primary"
+                className="w-full"
+                isLoading={loading}
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="tracking-wide">ENTRAR</span>}
-              </button>
+                ENTRAR
+              </Button>
 
               <div className="text-center border-t border-brand-border pt-6 mt-6">
                 <p className="text-xs text-zinc-500 mb-3">Ainda não possui conta?</p>
@@ -225,70 +277,52 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
                 <p className="text-zinc-500 text-sm">Crie sua conta para acessar a plataforma.</p>
               </div>
 
-              <div className="group">
-                <label className="block text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1.5 group-focus-within:text-brand-gold transition-colors">Nome Completo</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-brand-gold transition-colors" />
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-brand-dark border border-brand-border rounded-lg py-3 pl-10 pr-4 text-zinc-200 text-sm focus:outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20 transition-all placeholder-zinc-700"
-                    placeholder="Seu nome"
-                  />
-                </div>
-              </div>
+              <Input
+                label="Nome Completo"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Seu nome"
+                icon={<User className="w-4 h-4" />}
+              />
 
-              <div className="group">
-                <label className="block text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1.5 group-focus-within:text-brand-gold transition-colors">E-mail</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-brand-gold transition-colors" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-brand-dark border border-brand-border rounded-lg py-3 pl-10 pr-4 text-zinc-200 text-sm focus:outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20 transition-all placeholder-zinc-700"
-                    placeholder="seu@email.com"
-                  />
-                </div>
-              </div>
+              <Input
+                label="E-mail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                icon={<Mail className="w-4 h-4" />}
+              />
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="group">
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1.5 group-focus-within:text-brand-gold transition-colors">Senha</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-brand-gold transition-colors" />
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-brand-dark border border-brand-border rounded-lg py-3 pl-10 pr-4 text-zinc-200 text-sm focus:outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20 transition-all placeholder-zinc-700"
-                      placeholder="••••••"
-                    />
-                  </div>
-                </div>
-                <div className="group">
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-1.5 group-focus-within:text-brand-gold transition-colors">Confirmar Senha</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-brand-gold transition-colors" />
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full bg-brand-dark border border-brand-border rounded-lg py-3 pl-10 pr-4 text-zinc-200 text-sm focus:outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20 transition-all placeholder-zinc-700"
-                      placeholder="••••••"
-                    />
-                  </div>
-                </div>
+                <Input
+                  label="Senha"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••"
+                  icon={<Lock className="w-4 h-4" />}
+                />
+
+                <Input
+                  label="Confirmar Senha"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••"
+                  icon={<Lock className="w-4 h-4" />}
+                />
               </div>
 
-              <button
+              <Button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-brand-gold text-black font-bold py-3.5 rounded-lg hover:bg-[#E5C158] transition-all flex items-center justify-center gap-2 mt-2 shadow-[0_4px_20px_rgba(212,175,55,0.15)] disabled:opacity-70"
+                variant="primary"
+                className="w-full mt-2"
+                isLoading={loading}
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="tracking-wide text-xs">CADASTRAR</span>}
-              </button>
+                CADASTRAR
+              </Button>
             </form>
           ) : (
             <form onSubmit={handleRecover} className="space-y-6 animate-fade-in">
@@ -305,27 +339,23 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
                 <p className="text-zinc-500 text-sm">Protocolo de segurança para redefinição.</p>
               </div>
 
-              <div className="group">
-                <label className="block text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-2 group-focus-within:text-brand-gold transition-colors">E-mail Cadastrado</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-brand-gold transition-colors" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-brand-dark border border-brand-border rounded-lg py-3.5 pl-10 pr-4 text-zinc-200 text-sm focus:outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20 transition-all placeholder-zinc-700 shadow-inner"
-                    placeholder="seu@email.com"
-                  />
-                </div>
-              </div>
+              <Input
+                label="E-mail Cadastrado"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                icon={<Mail className="w-4 h-4" />}
+              />
 
-              <button
+              <Button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-zinc-800 border border-zinc-700 text-white font-bold py-3.5 rounded-lg hover:bg-zinc-700 hover:border-zinc-600 transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-70"
+                variant="secondary"
+                className="w-full mt-4"
+                isLoading={loading}
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span className="tracking-wide text-xs">ENVIAR LINK SEGURO</span>}
-              </button>
+                ENVIAR LINK SEGURO
+              </Button>
             </form>
           )}
         </div>
