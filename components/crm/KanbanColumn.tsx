@@ -12,10 +12,12 @@ interface KanbanColumnProps {
     onDrop: (e: React.DragEvent, stage: LeadStage) => void;
     onDragStart: (e: React.DragEvent, id: string) => void;
     onLeadClick: (lead: Lead) => void;
-    onWhatsAppClick: (phone: string) => void;
     // Helper functions passed down for presentation logic
     getTagStyle: (tagId?: string) => { bg: string; border: string; text: string } | null;
     getEventName: (id?: string) => string | undefined;
+    isBulkMode?: boolean;
+    selectedLeadIds?: string[];
+    onToggleSelect?: (id: string) => void;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
@@ -30,6 +32,9 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
     onWhatsAppClick,
     getTagStyle,
     getEventName,
+    isBulkMode,
+    selectedLeadIds,
+    onToggleSelect,
 }) => {
     return (
         <div
@@ -68,6 +73,9 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
                             onDragStart={onDragStart}
                             onClick={onLeadClick}
                             onWhatsAppClick={onWhatsAppClick}
+                            isBulkMode={isBulkMode}
+                            isSelected={selectedLeadIds?.includes(lead.id)}
+                            onToggleSelect={onToggleSelect}
                         />
                     ))
                 )}

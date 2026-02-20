@@ -18,6 +18,13 @@ export interface Profile {
   createdAt?: string;
 }
 
+export interface Seller {
+  id: string;
+  name: string;
+  phone?: string;
+  createdAt?: string;
+}
+
 export interface Lead {
   id: string;
   name: string;
@@ -29,6 +36,8 @@ export interface Lead {
   value: number;
   lastContact: string;
   tagId?: string;
+  ownerId?: string;
+  owner?: Seller;
   createdAt?: string;
 }
 

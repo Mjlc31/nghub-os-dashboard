@@ -34,6 +34,7 @@ const TAG_STYLES = [
 const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [team, setTeam] = useState<{ id: string, name: string, phone?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -72,7 +73,16 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const [isEditStagesModalOpen, setIsEditStagesModalOpen] = useState(false);
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [newLeadForm, setNewLeadForm] = useState({ name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '' });
+  const [newLeadForm, setNewLeadForm] = useState({ name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '', ownerId: '' });
+
+  // Bulk Selection
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [bulkOwnerId, setBulkOwnerId] = useState('');
+
+  // Sellers Management
+  const [isSellersModalOpen, setIsSellersModalOpen] = useState(false);
+  const [newSellerForm, setNewSellerForm] = useState({ name: '', phone: '' });
 
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +91,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
 
   useEffect(() => {
     fetchEvents();
+    fetchTeam();
     fetchLeads();
     const savedStages = localStorage.getItem('nghub_crm_stages');
     if (savedStages) {
@@ -88,6 +99,11 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       setTempStageNames(JSON.parse(savedStages));
     }
   }, []);
+
+  const fetchTeam = async () => {
+    const { data } = await supabase.from('sellers').select('id, name, phone');
+    if (data) setTeam(data);
+  };
 
   const saveStageNames = () => {
     setStageNames(tempStageNames);
@@ -97,14 +113,14 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   };
 
   const fetchEvents = async () => {
-    const { data } = await supabase.from('events').select('id, title').order('date', { ascending: false });
+    const { data } = await supabase.from('events').select('id, title, price').order('date', { ascending: false });
     if (data) setEvents(data as any);
   };
 
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('leads').select('*, owner:sellers(name, phone)').order('created_at', { ascending: false });
       if (error) throw error;
 
       const mappedLeads: Lead[] = (data || []).map((l: any) => ({
@@ -118,6 +134,8 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         value: Number(l.value),
         lastContact: l.last_contact,
         tagId: l.tag_id,
+        ownerId: l.owner_id,
+        owner: l.owner ? { id: l.owner_id, name: l.owner.name, phone: l.owner.phone } : undefined,
         createdAt: l.created_at
       }));
 
@@ -164,8 +182,17 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       if (error) fetchLeads();
       else {
         onNotify('success', `Lead movido para ${stageNames[targetStage]}`);
-        if (targetStage === LeadStage.WON && lead.value > 0) {
-          await supabase.from('transactions').insert([{ description: `Venda: ${lead.name}`, amount: lead.value, type: 'income', category: 'CRM', date: new Date().toISOString() }]);
+        if (targetStage === LeadStage.WON) {
+          const eventPrice = lead.tagId ? (events.find(e => e.id === lead.tagId)?.price || lead.value) : lead.value;
+          if (eventPrice > 0) {
+            await supabase.from('transactions').insert([{ description: `Venda: ${lead.name}`, amount: eventPrice, type: 'income', category: 'CRM', date: new Date().toISOString() }]);
+          }
+        } else if ((lead.stage as string) === LeadStage.WON) {
+          // Se o lead saiu de Venda Fechada, remove a transação
+          await supabase.from('transactions')
+            .delete()
+            .eq('description', `Venda: ${lead.name}`)
+            .eq('category', 'CRM');
         }
       }
     }
@@ -175,15 +202,44 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   // Logic for Tag Update on Existing Lead
   const handleUpdateLeadTag = async (leadId: string, tagId: string) => {
     try {
-      const { error } = await supabase.from('leads').update({ tag_id: tagId || null }).eq('id', leadId);
+      const selectedEvent = events.find(e => e.id === tagId);
+      const newEventPrice = selectedEvent ? selectedEvent.price : 0;
+      const currentLead = leads.find(l => l.id === leadId);
+      const finalValueToSave = newEventPrice > 0 ? newEventPrice : (currentLead?.value || 0);
+
+      const { error } = await supabase.from('leads').update({ tag_id: tagId || null, value: finalValueToSave }).eq('id', leadId);
       if (error) throw error;
 
       // Update local state
-      setLeads(leads.map(l => l.id === leadId ? { ...l, tagId: tagId || undefined } : l));
+      setLeads(leads.map(l => l.id === leadId ? { ...l, tagId: tagId || undefined, value: finalValueToSave } : l));
+
+      // Synchronize transaction if lead is WON
+      if (currentLead?.stage === LeadStage.WON && currentLead.name) {
+        // Verifica se já existe uma transação
+        const { data: existingTx } = await supabase.from('transactions')
+          .select('id')
+          .eq('description', `Venda: ${currentLead.name}`)
+          .eq('category', 'CRM')
+          .limit(1);
+
+        if (existingTx && existingTx.length > 0) {
+          if (finalValueToSave > 0) {
+            await supabase.from('transactions')
+              .update({ amount: finalValueToSave })
+              .eq('id', existingTx[0].id);
+          } else {
+            await supabase.from('transactions')
+              .delete()
+              .eq('id', existingTx[0].id);
+          }
+        } else if (finalValueToSave > 0) {
+          await supabase.from('transactions').insert([{ description: `Venda: ${currentLead.name}`, amount: finalValueToSave, type: 'income', category: 'CRM', date: new Date().toISOString() }]);
+        }
+      }
 
       // Update selected lead context
       if (selectedLead && selectedLead.id === leadId) {
-        setSelectedLead({ ...selectedLead, tagId: tagId || undefined });
+        setSelectedLead({ ...selectedLead, tagId: tagId || undefined, value: finalValueToSave });
       }
 
       onNotify('success', 'Etiqueta atualizada!');
@@ -203,15 +259,98 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         email: newLeadForm.email,
         phone: newLeadForm.phone,
         tag_id: newLeadForm.tagId || null,
+        owner_id: newLeadForm.ownerId || null,
         stage: LeadStage.NEW_LEAD,
         value: Number(newLeadForm.value) || 0
       }]);
       if (error) throw error;
       onNotify('success', 'Lead adicionado!');
       setIsAddModalOpen(false);
-      setNewLeadForm({ name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '' });
+      setNewLeadForm({ name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '', ownerId: '' });
       fetchLeads();
     } catch (err) { onNotify('error', 'Erro ao salvar lead.'); }
+  };
+
+  const handleUpdateLeadOwner = async (leadId: string, ownerId: string) => {
+    try {
+      const { error } = await supabase.from('leads').update({ owner_id: ownerId || null }).eq('id', leadId);
+      if (error) throw error;
+
+      const newOwnerInfo = ownerId ? team.find(m => m.id === ownerId) : undefined;
+
+      setLeads(leads.map(l => l.id === leadId ? { ...l, ownerId: ownerId || undefined, owner: newOwnerInfo ? { id: newOwnerInfo.id, name: newOwnerInfo.name, phone: newOwnerInfo.phone } : undefined } : l));
+
+      if (selectedLead && selectedLead.id === leadId) {
+        setSelectedLead({ ...selectedLead, ownerId: ownerId || undefined, owner: newOwnerInfo ? { id: newOwnerInfo.id, name: newOwnerInfo.name, phone: newOwnerInfo.phone } : undefined });
+      }
+
+      onNotify('success', 'Responsável atualizado!');
+    } catch (error) {
+      console.error(error);
+      onNotify('error', 'Erro ao atualizar responsável.');
+    }
+  };
+
+  const toggleLeadSelection = (id: string) => {
+    setSelectedLeadIds(prev =>
+      prev.includes(id) ? prev.filter(leadId => leadId !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkAssign = async () => {
+    if (!bulkOwnerId) return onNotify('error', 'Selecione um responsável.');
+    if (selectedLeadIds.length === 0) return onNotify('error', 'Nenhum lead selecionado.');
+
+    try {
+      const { error } = await supabase.from('leads')
+        .update({ owner_id: bulkOwnerId })
+        .in('id', selectedLeadIds);
+
+      if (error) throw error;
+
+      const newOwnerInfo = team.find(m => m.id === bulkOwnerId);
+
+      // Update local state
+      setLeads(leads.map(l => selectedLeadIds.includes(l.id) ? { ...l, ownerId: bulkOwnerId, owner: newOwnerInfo ? { id: newOwnerInfo.id, name: newOwnerInfo.name, phone: newOwnerInfo.phone } : undefined } : l));
+
+      onNotify('success', `${selectedLeadIds.length} leads atribuídos!`);
+
+      // Trigger WhatsApp
+      if (newOwnerInfo?.phone) {
+        const cleanPhone = newOwnerInfo.phone.replace(/\D/g, '');
+        const message = encodeURIComponent(`Olá ${newOwnerInfo.name}, você tem ${selectedLeadIds.length} novos leads na NGHUB OS aguardando atendimento.`);
+        window.open(`https://wa.me/55${cleanPhone}?text=${message}`, '_blank');
+      }
+
+      setIsBulkMode(false);
+      setSelectedLeadIds([]);
+      setBulkOwnerId('');
+    } catch (err) { onNotify('error', 'Erro ao atribuir leads em lote.'); }
+  };
+
+  const handleAddSeller = async () => {
+    if (!newSellerForm.name || !newSellerForm.phone) return onNotify('error', 'Nome e telefone (WhatsApp) são obrigatórios.');
+    try {
+      const { error } = await supabase.from('sellers').insert([{
+        name: newSellerForm.name,
+        phone: newSellerForm.phone
+      }]);
+      if (error) throw error;
+      onNotify('success', 'Vendedor adicionado!');
+      setNewSellerForm({ name: '', phone: '' });
+      fetchTeam(); // Refresh team list
+    } catch (err) { onNotify('error', 'Erro ao adicionar vendedor.'); }
+  };
+
+  const handleDeleteSeller = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja remover este vendedor? Leads sob sua responsabilidade perderão este vínculo.')) return;
+    try {
+      const { error } = await supabase.from('sellers').delete().eq('id', id);
+      if (error) throw error;
+      onNotify('success', 'Vendedor removido!');
+      fetchTeam();
+      fetchLeads(); // Sync leads that might have lost their owner
+    } catch (err) { onNotify('error', 'Erro ao remover vendedor.'); }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -283,9 +422,22 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
             />
           </div>
 
-          <button onClick={() => setIsEditStagesModalOpen(true)} className="p-2.5 text-zinc-400 hover:text-brand-gold bg-zinc-900 border border-zinc-800 rounded-lg transition-colors hidden md:block" title="Editar Etapas">
-            <Settings className="w-4 h-4" />
-          </button>
+          <div className="flex gap-2 hidden md:flex">
+            <button
+              onClick={() => { setIsBulkMode(!isBulkMode); setSelectedLeadIds([]); setBulkOwnerId(''); }}
+              className={`p-2.5 text-sm font-medium rounded-lg border transition-all flex items-center gap-2 ${isBulkMode ? 'bg-brand-gold text-black border-brand-gold shadow-[0_0_15px_rgba(212,175,55,0.3)]' : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-brand-gold'}`}
+              title="Selecionar Vários"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span className="hidden lg:inline">{isBulkMode ? 'Cancelar Seleção' : 'Selecionar Vários'}</span>
+            </button>
+            <button onClick={() => setIsSellersModalOpen(true)} className="p-2.5 text-zinc-400 hover:text-brand-gold bg-zinc-900 border border-zinc-800 rounded-lg transition-colors" title="Gerenciar Equipe / Responsáveis">
+              <UserPlus className="w-4 h-4" />
+            </button>
+            <button onClick={() => setIsEditStagesModalOpen(true)} className="p-2.5 text-zinc-400 hover:text-brand-gold bg-zinc-900 border border-zinc-800 rounded-lg transition-colors" title="Editar Etapas">
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
 
           <div className="flex flex-1 md:flex-none items-center bg-brand-surface border border-zinc-800 rounded-xl p-1 gap-1 w-full md:w-auto mt-2 md:mt-0">
             <div className="relative flex-1 md:w-64">
@@ -318,7 +470,10 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
           {stageKeys.map((stage) => {
             const isActive = activeMobileStage === stage;
             const stageLeads = leads.filter(l => l.stage === stage);
-            const stageValue = stageLeads.reduce((acc, curr) => acc + curr.value, 0);
+            const stageValue = stageLeads.reduce((acc, curr) => {
+              const eventPrice = curr.tagId ? events.find(e => e.id === curr.tagId)?.price : undefined;
+              return acc + (eventPrice !== undefined && eventPrice > 0 ? eventPrice : curr.value);
+            }, 0);
 
             return (
               <button
@@ -396,14 +551,18 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
                     )}
                   </div>
 
-                  {lead.value > 0 ? (
-                    <div className="text-sm font-bold text-white font-mono flex items-center gap-1">
-                      <span className="text-zinc-600 text-[10px]">R$</span>
-                      {lead.value.toLocaleString('pt-BR')}
-                    </div>
-                  ) : (
-                    <div className="text-[10px] text-zinc-600 uppercase font-bold tracking-wider">Sem valor</div>
-                  )}
+                  {(() => {
+                    const displayPrice = lead.tagId ? (events.find(e => e.id === lead.tagId)?.price || lead.value) : lead.value;
+                    if (displayPrice > 0) {
+                      return (
+                        <div className="text-sm font-bold text-white font-mono flex items-center gap-1">
+                          <span className="text-zinc-600 text-[10px]">R$</span>
+                          {displayPrice.toLocaleString('pt-BR')}
+                        </div>
+                      );
+                    }
+                    return <div className="text-[10px] text-zinc-600 uppercase font-bold tracking-wider">Sem valor</div>;
+                  })()}
                 </div>
               </div>
             )
@@ -491,7 +650,10 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         <div className="flex gap-4 min-w-[1200px] h-full">
           {stageKeys.map((stage) => {
             const stageLeads = filteredLeads.filter(l => l.stage === stage);
-            const totalValue = stageLeads.reduce((acc, l) => acc + l.value, 0);
+            const totalValue = stageLeads.reduce((acc, l) => {
+              const eventPrice = l.tagId ? events.find(e => e.id === l.tagId)?.price : undefined;
+              return acc + (eventPrice !== undefined && eventPrice > 0 ? eventPrice : l.value);
+            }, 0);
 
             return (
               <KanbanColumn
@@ -527,6 +689,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         formData={newLeadForm}
         setFormData={setNewLeadForm}
         events={events}
+        team={team}
       />
 
       {/* Edit Stages Modal */}
@@ -545,6 +708,51 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         </div>
       </Modal>
 
+      {/* Gerenciar Equipe (Sellers) Modal */}
+      <Modal isOpen={isSellersModalOpen} onClose={() => setIsSellersModalOpen(false)} title="Equipe de Vendas (Responsáveis)">
+        <div className="space-y-6">
+          <p className="text-xs text-zinc-500">Cadastre o nome e WhatsApp dos responsáveis para poder distribuir leads e notificá-los com 1 clique.</p>
+
+          <div className="bg-zinc-900/50 p-4 border border-zinc-800 rounded-xl space-y-4">
+            <h4 className="text-sm font-bold text-white mb-2">Novo Vendedor</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                placeholder="Nome Ex: João"
+                value={newSellerForm.name}
+                onChange={(e) => setNewSellerForm({ ...newSellerForm, name: e.target.value })}
+                icon={<UserPlus className="w-4 h-4" />}
+              />
+              <Input
+                placeholder="WhatsApp (com DDD)"
+                value={newSellerForm.phone}
+                onChange={(e) => setNewSellerForm({ ...newSellerForm, phone: e.target.value })}
+                icon={<Phone className="w-4 h-4" />}
+              />
+            </div>
+            <Button onClick={handleAddSeller} variant="primary" className="w-full">Cadastrar Membro</Button>
+          </div>
+
+          <div className="space-y-2 mt-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+            <h4 className="text-sm font-bold text-white mb-3">Membros Cadastrados ({team.length})</h4>
+            {team.length === 0 ? (
+              <p className="text-xs text-zinc-500 text-center py-4">Nenhum membro cadastrado ainda.</p>
+            ) : (
+              team.map(member => (
+                <div key={member.id} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                  <div>
+                    <p className="text-sm font-bold text-zinc-200">{member.name}</p>
+                    <p className="text-xs text-brand-gold font-mono">{member.phone}</p>
+                  </div>
+                  <button onClick={() => handleDeleteSeller(member.id)} className="p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-500 transition-colors rounded-lg">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </Modal>
+
       {/* Lead Detail Modal */}
       <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Detalhes do Lead">
         {selectedLead && (
@@ -553,17 +761,23 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
               <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center text-xl font-bold text-brand-gold border border-zinc-700">
                 {selectedLead.name.charAt(0)}
               </div>
-              <div className="flex-1">
+              <div className="flex-[1]">
                 <h3 className="text-xl font-serif font-bold text-white">{selectedLead.name}</h3>
                 <p className="text-zinc-400 text-sm">{selectedLead.company} • {selectedLead.sector}</p>
 
                 {/* Value display */}
-                {selectedLead.value > 0 && <p className="text-emerald-400 font-mono text-sm mt-1">R$ {selectedLead.value.toLocaleString('pt-BR')}</p>}
+                {(() => {
+                  const displayPrice = selectedLead.tagId ? (events.find(e => e.id === selectedLead.tagId)?.price || selectedLead.value) : selectedLead.value;
+                  if (displayPrice > 0) {
+                    return <p className="text-emerald-400 font-mono text-sm mt-1">R$ {displayPrice.toLocaleString('pt-BR')}</p>;
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 
-            {/* TAG EDITING SECTION */}
-            <div className="mt-4 pt-4 border-t border-zinc-800">
+            {/* TAG E OWNER EDITING SECTION */}
+            <div className="mt-4 pt-4 border-t border-zinc-800 grid gap-4">
               <Select
                 label="Etiqueta (Evento)"
                 value={selectedLead.tagId || ''}
@@ -573,6 +787,32 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
                   ...events.map(ev => ({ value: ev.id, label: ev.title }))
                 ]}
               />
+
+              <div className="space-y-2">
+                <Select
+                  label="Responsável"
+                  value={selectedLead.ownerId || ''}
+                  onChange={(e) => handleUpdateLeadOwner(selectedLead.id, e.target.value)}
+                  options={[
+                    { value: '', label: 'Sem responsável' },
+                    ...team.map(member => ({ value: member.id, label: member.name }))
+                  ]}
+                />
+                {selectedLead.ownerId && selectedLead.owner?.phone && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-green-500 hover:text-green-400 hover:bg-green-500/10 border border-green-500/20"
+                    onClick={() => {
+                      const message = encodeURIComponent(`Olá ${selectedLead.owner?.name}, você tem um novo lead na NGHUB OS: ${selectedLead.name}.`);
+                      window.open(`https://wa.me/55${selectedLead.owner?.phone?.replace(/\\D/g, '')}?text=${message}`, '_blank');
+                    }}
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Notificar Responsável
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800">
@@ -582,7 +822,33 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
           </div>
         )}
       </Modal>
+
+      {/* FLOATING BULK ACTION BAR */}
+      {isBulkMode && selectedLeadIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-50 animate-slide-up">
+          <div className="flex flex-col border-r border-zinc-800 pr-6">
+            <span className="text-white font-bold">{selectedLeadIds.length} {selectedLeadIds.length === 1 ? 'lead selecionado' : 'leads selecionados'}</span>
+            <span className="text-xs text-zinc-500">Prontos para atribuição</span>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <Select
+              value={bulkOwnerId}
+              onChange={(e) => setBulkOwnerId(e.target.value)}
+              options={[
+                { value: '', label: 'Escolha um responsável...' },
+                ...team.map(member => ({ value: member.id, label: member.name }))
+              ]}
+            />
+            <Button onClick={handleBulkAssign} variant="primary" size="md" className="whitespace-nowrap px-6">
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Salvar e Notificar
+            </Button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+
 export default CRM;

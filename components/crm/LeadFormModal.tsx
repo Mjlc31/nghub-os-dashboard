@@ -14,6 +14,7 @@ interface LeadFormState {
     phone: string;
     tagId: string;
     value: string;
+    ownerId: string;
 }
 
 interface LeadFormModalProps {
@@ -23,6 +24,7 @@ interface LeadFormModalProps {
     formData: LeadFormState;
     setFormData: (data: LeadFormState) => void;
     events: Event[];
+    team: { id: string; name: string }[];
 }
 
 export const LeadFormModal: React.FC<LeadFormModalProps> = ({
@@ -32,6 +34,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     formData,
     setFormData,
     events,
+    team,
 }) => {
     return (
         <Modal
@@ -98,6 +101,29 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                             {events.map((ev) => (
                                 <option key={ev.id} value={ev.id}>
                                     {ev.title} {ev.price > 0 && `(R$ ${ev.price})`}
+                                </option>
+                            ))}
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-zinc-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* Owner Selection */}
+                <div className="relative">
+                    <label htmlFor="owner-select" className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5 opacity-70">
+                        Responsável
+                    </label>
+                    <div className="relative">
+                        <select
+                            id="owner-select"
+                            value={formData.ownerId}
+                            onChange={(e) => setFormData({ ...formData, ownerId: e.target.value })}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-zinc-200 focus:border-brand-gold focus:outline-none focus:ring-1 focus:ring-brand-gold/20 text-sm appearance-none shadow-inner transition-all hover:border-zinc-700"
+                        >
+                            <option value="">Sem responsável</option>
+                            {team.map((member) => (
+                                <option key={member.id} value={member.id}>
+                                    {member.name}
                                 </option>
                             ))}
                         </select>

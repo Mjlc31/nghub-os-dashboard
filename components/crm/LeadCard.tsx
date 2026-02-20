@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, CheckCircle, Circle } from 'lucide-react';
 import { Lead } from '../../types';
 
 interface LeadCardProps {
@@ -9,6 +9,9 @@ interface LeadCardProps {
     onDragStart: (e: React.DragEvent, id: string) => void;
     onClick: (lead: Lead) => void;
     onWhatsAppClick: (phone: string) => void;
+    isBulkMode?: boolean;
+    isSelected?: boolean;
+    onToggleSelect?: (id: string) => void;
 }
 
 export const LeadCard: React.FC<LeadCardProps> = ({
@@ -18,16 +21,18 @@ export const LeadCard: React.FC<LeadCardProps> = ({
     onDragStart,
     onClick,
     onWhatsAppClick,
+    isBulkMode,
+    isSelected,
+    onToggleSelect
 }) => {
     return (
         <div
-            draggable
-            onDragStart={(e) => onDragStart(e, lead.id)}
-            onClick={() => onClick(lead)}
-            className={`p-4 rounded-xl cursor-grab transition-all group relative border bg-zinc-900/80 hover:shadow-lg ${colorStyle ? colorStyle.border : 'border-zinc-800/60 hover:border-brand-gold/30'
-                }`}
+            draggable={!isBulkMode}
+            onDragStart={(e) => !isBulkMode && onDragStart(e, lead.id)}
+            onClick={() => isBulkMode && onToggleSelect ? onToggleSelect(lead.id) : onClick(lead)}
+            className={`p-4 rounded-xl transition-all group relative border ${isSelected ? 'bg-brand-gold/10 border-brand-gold/50' : 'bg-zinc-900/80'} ${!isBulkMode && 'cursor-grab hover:shadow-lg'} ${colorStyle && !isSelected ? colorStyle.border : ''} ${!isSelected && !colorStyle ? 'border-zinc-800/60 hover:border-brand-gold/30' : ''}`}
         >
-            {/* Colored Left Bar */}
+            {/* Colored Left Bar for Tags */}
             {colorStyle && (
                 <div
                     className={`absolute top-0 left-0 bottom-0 w-1 rounded-l-xl ${colorStyle.bg.replace(
@@ -53,10 +58,25 @@ export const LeadCard: React.FC<LeadCardProps> = ({
 
             {/* Main Info */}
             <div className="pl-2">
-                <h4 className="text-white font-bold text-sm group-hover:text-brand-gold transition-colors">
-                    {lead.name}
+                <h4 className="text-white font-bold text-sm group-hover:text-brand-gold transition-colors flex justify-between items-start">
+                    <span className="truncate pr-4">{lead.name}</span>
+                    {isBulkMode && (
+                        <div className="absolute top-4 right-4 text-zinc-500">
+                            {isSelected ? <CheckCircle className="w-5 h-5 text-brand-gold" /> : <Circle className="w-5 h-5" />}
+                        </div>
+                    )}
                 </h4>
-                <p className="text-zinc-500 text-xs mt-0.5 truncate">{lead.company}</p>
+                <p className="text-zinc-500 text-xs mt-0.5 shrink-0 truncate flex items-center gap-1.5">
+                    {lead.company}
+                    {lead.owner && (
+                        <>
+                            <span className="text-zinc-700">•</span>
+                            <span className="text-zinc-400 font-medium ml-0.5 truncate flex-shrink">
+                                Resp: {lead.owner.name.split(' ')[0]}
+                            </span>
+                        </>
+                    )}
+                </p>
             </div>
 
             {/* Footer: Value & Actions */}
