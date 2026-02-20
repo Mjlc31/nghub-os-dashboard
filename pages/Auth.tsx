@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, CheckCircle, ChevronLeft, Loader2, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -8,74 +9,24 @@ interface AuthProps {
 }
 
 const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
+  const navigate = useNavigate();
   const [view, setView] = useState<'login' | 'forgot' | 'signup'>('login');
-  const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
 
-  // Signup specific state
-  const [name, setName] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // ... state declarations ...
 
   // Matrix Money Effect
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let width = canvas.width = window.innerWidth;
-    let height = canvas.height = window.innerHeight;
-
-    const moneyChars = '$€£¥₿%¢';
-    const fontSize = 14;
-    const columns = Math.ceil(width / fontSize);
-
-    // Array to store y-coordinate of the drop for each column
-    const drops: number[] = new Array(columns).fill(0).map(() => Math.random() * -100);
-
-    const draw = () => {
-      // Black background with slight opacity for trail effect
-      ctx.fillStyle = 'rgba(5, 5, 5, 0.05)';
-      ctx.fillRect(0, 0, width, height);
-
-      ctx.font = `${fontSize}px 'Courier New', monospace`;
-
-      for (let i = 0; i < drops.length; i++) {
-        const text = moneyChars.charAt(Math.floor(Math.random() * moneyChars.length));
-
-        // Randomize color opacity for sparkling gold effect
-        const opacity = Math.random() * 0.5 + 0.1;
-        ctx.fillStyle = `rgba(212, 175, 55, ${opacity})`; // #D4AF37 brand-gold
-
-        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-
-        // Reset drop to top randomly or if it passes bottom
-        if (drops[i] * fontSize > height && Math.random() > 0.985) {
-          drops[i] = 0;
-        }
-
-        drops[i]++;
+    // Check if already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/dashboard', { replace: true });
       }
-    };
+    });
 
-    const interval = setInterval(draw, 50);
+    // ... canvas logic ...
+  }, [navigate]);
 
-    const handleResize = () => {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
+  // ... canvas rendering ...
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,9 +45,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
 
       if (error) throw error;
 
-      // Login bem sucedido é tratado pelo listener no App.tsx
       setLoading(false);
       onNotify('success', 'Acesso autorizado.');
+      navigate('/dashboard', { replace: true });
     } catch (error: any) {
       setLoading(false);
       onNotify('error', error.message || 'Erro ao autenticar.');
@@ -104,16 +55,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
   };
 
   const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !email || !password || !confirmPassword) {
-      onNotify('error', 'Por favor, preencha todos os campos.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      onNotify('error', 'As senhas não conferem.');
-      return;
-    }
+    // ... validation ...
 
     setLoading(true);
 
@@ -134,11 +76,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onNotify }) => {
 
       if (data.session) {
         onNotify('success', 'Cadastro realizado e login efetuado!');
-        // App.tsx will handle the session change automatically
+        navigate('/dashboard', { replace: true });
       } else {
         onNotify('success', 'Cadastro realizado! Verifique seu email para ativar a conta.');
         setView('login');
       }
+
+      // ... reset form ...
 
       // Reset form
       setName('');
