@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   DollarSign,
   TrendingUp,
@@ -17,8 +18,13 @@ interface DashboardProps {
   onNavigate: (view: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+const Dashboard: React.FC = () => {
   const { loading, kpis, chartData, funnelData, recentActivity } = useDashboardData();
+  const navigate = useNavigate();
+
+  const handleNavigate = (path: string, openModal = false) => {
+    navigate(path, { state: { openModal } });
+  };
 
   if (loading) return <div className="flex justify-center items-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-gold"></div></div>;
 
@@ -88,7 +94,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         {/* Quick Actions / Stats */}
         <div className="grid grid-cols-2 gap-4">
           <div
-            onClick={() => onNavigate('finance')}
+            onClick={() => handleNavigate('/finance', true)}
             className="bg-gradient-to-br from-brand-surface to-[#1e1e24] border border-brand-border rounded-xl p-6 flex flex-col justify-center items-center text-center group hover:border-brand-gold/30 transition-colors cursor-pointer"
           >
             <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
@@ -98,7 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <p className="text-xs text-zinc-500">Ir para Financeiro</p>
           </div>
           <div
-            onClick={() => onNavigate('crm')}
+            onClick={() => handleNavigate('/crm', true)}
             className="bg-gradient-to-br from-brand-surface to-[#1e1e24] border border-brand-border rounded-xl p-6 flex flex-col justify-center items-center text-center group hover:border-brand-gold/30 transition-colors cursor-pointer"
           >
             <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">

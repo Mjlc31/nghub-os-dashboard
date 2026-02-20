@@ -11,6 +11,7 @@ import Finance from './pages/Finance';
 import Messaging from './pages/Messaging';
 import Settings from './pages/Settings';
 import Toast, { ToastMessage, ToastType } from './components/ui/Toast';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 const App: React.FC = () => {
   const [toasts, setToasts] = React.useState<ToastMessage[]>([]);
@@ -29,25 +30,27 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Auth onLogin={() => { }} onNotify={addToast} />} />
+      <NotificationProvider>
+        <Routes>
+          <Route path="/login" element={<Auth onLogin={() => { }} onNotify={addToast} />} />
 
-        <Route element={<RouteGuard />}>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard onNavigate={() => { }} />} />
-            <Route path="/crm" element={<CRM onNotify={addToast} />} />
-            <Route path="/events" element={<Events onNotify={addToast} />} />
-            <Route path="/academy" element={<Academy />} />
-            <Route path="/finance" element={<Finance />} />
-            <Route path="/messaging" element={<Messaging onNotify={addToast} />} />
-            <Route path="/settings" element={<Settings onNotify={addToast} />} />
+          <Route element={<RouteGuard />}>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/crm" element={<CRM onNotify={addToast} />} />
+              <Route path="/events" element={<Events onNotify={addToast} />} />
+              <Route path="/academy" element={<Academy />} />
+              <Route path="/finance" element={<Finance />} />
+              <Route path="/messaging" element={<Messaging onNotify={addToast} />} />
+              <Route path="/settings" element={<Settings onNotify={addToast} />} />
+            </Route>
           </Route>
-        </Route>
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-      <Toast toasts={toasts} removeToast={removeToast} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+        <Toast toasts={toasts} removeToast={removeToast} />
+      </NotificationProvider>
     </BrowserRouter>
   );
 };

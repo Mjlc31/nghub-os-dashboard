@@ -18,7 +18,8 @@ import {
    ArrowLeft,
    Image as ImageIcon,
    Loader2,
-   UploadCloud
+   UploadCloud,
+   Edit2
 } from 'lucide-react';
 import {
    BarChart,
@@ -55,6 +56,7 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
 
    // Form & Upload
    const [newEvent, setNewEvent] = useState({ title: '', date: '', location: '', capacity: '', price: '', imageUrl: '' });
+   const [editingEventId, setEditingEventId] = useState<string | null>(null);
    const [uploading, setUploading] = useState(false);
    const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -127,30 +129,57 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
       }
    };
 
-   const handleCreateEvent = async () => {
-      if (!newEvent.title || !newEvent.date) return;
-      try {
-         const { data, error } = await supabase.from('events').insert([
-            {
-               title: newEvent.title,
-               date: newEvent.date,
-               location: newEvent.location,
-               capacity: Number(newEvent.capacity),
-               price: Number(newEvent.price),
-               attendees_count: 0,
-               status: 'upcoming',
-               image_url: newEvent.imageUrl || `https://picsum.photos/seed/${newEvent.title}/800/400`
-            }
-         ]).select();
+   const handleEditEvent = (event: Event, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setEditingEventId(event.id);
+      setNewEvent({
+         title: event.title,
+         date: new Date(event.date).toISOString().slice(0, 16), // Format for datetime-local
+         location: event.location,
+         capacity: event.capacity.toString(),
+         price: event.price.toString(),
+         imageUrl: event.imageUrl
+      });
+      setIsCreateModalOpen(true);
+   };
 
-         if (error) throw error;
-         if (data) {
+   const handleSaveEvent = async () => {
+      if (!newEvent.title || !newEvent.date) return;
+
+      try {
+         const eventData = {
+            title: newEvent.title,
+            date: newEvent.date,
+            location: newEvent.location,
+            capacity: Number(newEvent.capacity),
+            price: Number(newEvent.price),
+            image_url: newEvent.imageUrl || `https://picsum.photos/seed/${newEvent.title}/800/400`
+         };
+
+         if (editingEventId) {
+            // Update existing event
+            const { error } = await supabase.from('events').update(eventData).eq('id', editingEventId);
+            if (error) throw error;
+            onNotify('success', 'Evento atualizado com sucesso!');
+         } else {
+            // Create new event
+            const { error } = await supabase.from('events').insert([{
+               ...eventData,
+               attendees_count: 0,
+               status: 'upcoming'
+            }]);
+            if (error) throw error;
             onNotify('success', 'Evento criado com sucesso!');
-            setIsCreateModalOpen(false);
-            setNewEvent({ title: '', date: '', location: '', capacity: '', price: '', imageUrl: '' });
-            fetchData();
          }
-      } catch (error) { onNotify('error', 'Erro ao criar evento'); }
+
+         setIsCreateModalOpen(false);
+         setNewEvent({ title: '', date: '', location: '', capacity: '', price: '', imageUrl: '' });
+         setEditingEventId(null);
+         fetchData();
+      } catch (error) {
+         console.error(error);
+         onNotify('error', `Erro ao ${editingEventId ? 'atualizar' : 'criar'} evento`);
+      }
    };
 
    const handleDeleteEvent = async (id: string, e: React.MouseEvent) => {
@@ -391,7 +420,12 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
                return (
                   <div key={event.id} onClick={() => openFinanceView(event)} className="bg-brand-surface border border-brand-border rounded-xl overflow-hidden group hover:border-brand-gold/30 hover:shadow-xl transition-all duration-300 flex flex-col relative cursor-pointer">
                      <div className="absolute top-3 right-3 z-20 flex gap-2">
-                        <button onClick={(e) => handleDeleteEvent(event.id, e)} className="p-2 bg-black/50 hover:bg-red-500 text-white rounded-full transition-all opacity-0 group-hover:opacity-100 backdrop-blur-sm"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={(e) => handleEditEvent(event, e)} className="p-2 bg-black/50 hover:bg-brand-gold hover:text-black text-white rounded-full transition-all opacity-0 group-hover:opacity-100 backdrop-blur-sm" title="Editar Evento">
+                           <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={(e) => handleDeleteEvent(event.id, e)} className="p-2 bg-black/50 hover:bg-red-500 text-white rounded-full transition-all opacity-0 group-hover:opacity-100 backdrop-blur-sm" title="Excluir Evento">
+                           <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                      </div>
 
                      <div className="h-40 relative overflow-hidden">
@@ -462,8 +496,8 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
                            </div>
                            <div className="flex items-center gap-2">
                               <span className={`text-[10px] px-2 py-0.5 rounded border uppercase tracking-wider font-bold ${guest.stage === LeadStage.WON
-                                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
-                                    : 'border-zinc-700 bg-zinc-800 text-zinc-500'
+                                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
+                                 : 'border-zinc-700 bg-zinc-800 text-zinc-500'
                                  }`}>
                                  {guest.stage === LeadStage.WON ? 'Confirmado' : 'Pendente'}
                               </span>
@@ -478,8 +512,30 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
             </div>
          </Modal>
 
-         {/* Create Event Modal */}
-         <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Criar Novo Evento" footer={<><button onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Cancelar</button><button onClick={handleCreateEvent} className="px-4 py-2 rounded-lg text-sm bg-brand-gold text-black font-semibold hover:bg-[#c5a059] transition-colors">Publicar Evento</button></>}>
+         {/* Create/Edit Event Modal */}
+         <Modal
+            isOpen={isCreateModalOpen}
+            onClose={() => {
+               setIsCreateModalOpen(false);
+               setEditingEventId(null);
+               setNewEvent({ title: '', date: '', location: '', capacity: '', price: '', imageUrl: '' });
+            }}
+            title={editingEventId ? "Editar Evento" : "Criar Novo Evento"}
+            footer={
+               <>
+                  <button onClick={() => {
+                     setIsCreateModalOpen(false);
+                     setEditingEventId(null);
+                     setNewEvent({ title: '', date: '', location: '', capacity: '', price: '', imageUrl: '' });
+                  }} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                     Cancelar
+                  </button>
+                  <button onClick={handleSaveEvent} className="px-4 py-2 rounded-lg text-sm bg-brand-gold text-black font-semibold hover:bg-[#c5a059] transition-colors">
+                     {editingEventId ? "Salvar Alterações" : "Publicar Evento"}
+                  </button>
+               </>
+            }
+         >
             <div className="space-y-4">
 
                {/* Image Upload Field */}

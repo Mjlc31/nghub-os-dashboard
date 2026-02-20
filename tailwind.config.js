@@ -20,6 +20,7 @@ export default {
         brand: {
           gold: '#D4AF37', // Metallic Gold
           dark: '#09090b', // Zinc-950
+          darker: '#050505', // Deep Black
           surface: '#18181b', // Zinc-900
           border: '#27272a', // Zinc-800
         }

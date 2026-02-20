@@ -10,12 +10,14 @@ import {
   LogOut,
   Menu,
   X,
-  Bell,
   Search,
   ChevronRight
 } from 'lucide-react';
-import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
+import { NotificationDropdown } from './ui/NotificationDropdown';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { SidebarItem } from './ui/SidebarItem';
+import { useUserProfile } from '../hooks/useUserProfile';
 
 // Sidebar Navigation Items
 const NAV_ITEMS = [
@@ -32,57 +34,14 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
-
-  useEffect(() => {
-    getProfile();
-  }, []);
-
-  const getProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setUserProfile({
-        email: user.email,
-        name: user.user_metadata?.full_name || 'Usuário',
-        avatar: user.user_metadata?.avatar_url
-      });
-    }
-  };
+  const { userProfile, loading } = useUserProfile();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login', { replace: true });
   };
 
-  const SidebarItem = ({ item }: { item: typeof NAV_ITEMS[0] }) => {
-    const isActive = location.pathname === item.path;
-    const Icon = item.icon;
 
-    return (
-      <Link
-        to={item.path}
-        onClick={() => setIsMobileMenuOpen(false)}
-        className={`
-          flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden
-          ${isActive
-            ? 'bg-brand-gold/10 text-brand-gold font-bold shadow-[0_0_20px_rgba(212,175,55,0.1)] border border-brand-gold/20'
-            : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5'}
-        `}
-      >
-        <div className={`
-          absolute inset-0 bg-gradient-to-r from-brand-gold/0 via-brand-gold/5 to-brand-gold/0 translate-x-[-100%] transition-transform duration-700
-          ${isActive ? 'translate-x-[100%]' : 'group-hover:translate-x-[100%]'}
-        `}></div>
-
-        <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-        <span className="relative z-10">{item.label}</span>
-
-        {isActive && (
-          <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-brand-gold shadow-[0_0_10px_#D4AF37]"></div>
-        )}
-      </Link>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-brand-dark flex font-sans text-zinc-100 selection:bg-brand-gold/30 selection:text-white overflow-hidden">
@@ -117,7 +76,11 @@ const Layout: React.FC = () => {
         <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
           <p className="px-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-4">Menu Principal</p>
           {NAV_ITEMS.map((item) => (
-            <SidebarItem key={item.path} item={item} />
+            <SidebarItem
+              key={item.path}
+              item={item}
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
           ))}
         </nav>
 
@@ -173,10 +136,7 @@ const Layout: React.FC = () => {
               />
             </div>
 
-            <button className="relative p-2 text-zinc-400 hover:text-brand-gold transition-colors block">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[#050505]"></span>
-            </button>
+            <NotificationDropdown />
           </div>
         </header>
 

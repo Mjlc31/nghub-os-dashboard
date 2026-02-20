@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Lead, LeadStage, Event } from '../types';
 import {
   MoreHorizontal, Plus, Search, Filter, Phone, Calendar, ArrowRight,
@@ -13,6 +14,8 @@ import { KanbanColumn } from '../components/crm/KanbanColumn';
 import { LeadFormModal } from '../components/crm/LeadFormModal';
 import { ImportLeadsModal } from '../components/crm/ImportLeadsModal';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
 
 interface CRMProps {
   onNotify: (type: 'success' | 'error' | 'info', msg: string) => void;
@@ -40,6 +43,16 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   // Mobile State
   const [activeMobileStage, setActiveMobileStage] = useState<LeadStage>(LeadStage.NEW_LEAD);
   const [mobileActionLead, setMobileActionLead] = useState<Lead | null>(null); // Lead selecionado para o menu bottom sheet
+
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.openModal) {
+      setIsAddModalOpen(true);
+      // Clear state to prevent reopening on refresh? (Optional, but good practice in some routers, though standard history usually keeps it)
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   // Initial stage names config
   const defaultStageNames = {
@@ -258,19 +271,16 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         {/* Mobile Search & Controls Row */}
         <div className="flex w-full md:w-auto items-center gap-2 flex-wrap">
           {/* Tag Filter */}
-          <div className="relative group flex-1 md:flex-none">
-            <select
+          <div className="relative group flex-1 md:flex-none min-w-[200px]">
+            <Select
               value={selectedTagFilter}
               onChange={(e) => setSelectedTagFilter(e.target.value)}
-              className="w-full md:w-auto appearance-none bg-zinc-900 border border-zinc-800 text-zinc-300 text-sm rounded-xl pl-9 pr-8 py-2.5 focus:border-brand-gold focus:outline-none hover:bg-zinc-800 transition-colors cursor-pointer min-w-[150px]"
-            >
-              <option value="all">Todas Etiquetas</option>
-              {events.map(event => (
-                <option key={event.id} value={event.id}>{event.title}</option>
-              ))}
-            </select>
-            <Tag className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <ChevronDown className="w-3 h-3 text-zinc-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              options={[
+                { value: 'all', label: 'Todas Etiquetas' },
+                ...events.map(event => ({ value: event.id, label: event.title }))
+              ]}
+              icon={<Tag className="w-4 h-4" />}
+            />
           </div>
 
           <button onClick={() => setIsEditStagesModalOpen(true)} className="p-2.5 text-zinc-400 hover:text-brand-gold bg-zinc-900 border border-zinc-800 rounded-lg transition-colors hidden md:block" title="Editar Etapas">
@@ -279,13 +289,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
 
           <div className="flex flex-1 md:flex-none items-center bg-brand-surface border border-zinc-800 rounded-xl p-1 gap-1 w-full md:w-auto mt-2 md:mt-0">
             <div className="relative flex-1 md:w-64">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 z-10" />
-              <input
-                type="text"
-                placeholder="Buscar..."
+              <Input
+                placeholder="Buscar (Nome ou Empresa)..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-transparent border-none text-sm pl-9 pr-4 py-2 text-zinc-200 focus:ring-0 placeholder-zinc-600 h-10"
+                icon={<Search className="w-3.5 h-3.5" />}
+                className="bg-transparent border-none focus:ring-0 h-10"
+                containerClassName="!mb-0"
               />
             </div>
             {/* Desktop Only Button */}
@@ -525,12 +535,10 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
           <p className="text-xs text-zinc-500 mb-4">Personalize os nomes das colunas do seu funil de vendas.</p>
           {stageKeys.map((key) => (
             <div key={key}>
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">Etapa {key}</label>
-              <input
-                type="text"
+              <Input
+                label={`Etapa ${key}`}
                 value={tempStageNames[key]}
                 onChange={(e) => setTempStageNames({ ...tempStageNames, [key]: e.target.value })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-white focus:border-brand-gold focus:outline-none text-sm"
               />
             </div>
           ))}
@@ -556,18 +564,15 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
 
             {/* TAG EDITING SECTION */}
             <div className="mt-4 pt-4 border-t border-zinc-800">
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-2">Etiqueta (Evento)</label>
-              <div className="relative">
-                <select
-                  value={selectedLead.tagId || ''}
-                  onChange={(e) => handleUpdateLeadTag(selectedLead.id, e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-white focus:border-brand-gold focus:outline-none text-sm appearance-none cursor-pointer hover:border-zinc-700 transition-colors"
-                >
-                  <option value="">Sem etiqueta</option>
-                  {events.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
-                </select>
-                <ChevronDown className="w-4 h-4 text-zinc-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
+              <Select
+                label="Etiqueta (Evento)"
+                value={selectedLead.tagId || ''}
+                onChange={(e) => handleUpdateLeadTag(selectedLead.id, e.target.value)}
+                options={[
+                  { value: '', label: 'Sem etiqueta' },
+                  ...events.map(ev => ({ value: ev.id, label: ev.title }))
+                ]}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800">

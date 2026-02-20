@@ -1,9 +1,10 @@
 import React from 'react';
-import { ChevronDown, User, Building, Briefcase, Mail, Phone, DollarSign } from 'lucide-react';
+import { User, Building, Briefcase, Mail, Phone, DollarSign, ChevronDown } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { Event } from '../../types';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { Select } from '../ui/Select';
 
 interface LeadFormState {
     name: string;
@@ -71,21 +72,32 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                     />
                 </div>
 
-                {/* Tag Selection in Modal (Select Manual mantido por enquanto) */}
-                <div>
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">
+                {/* Tag Selection */}
+                <div className="relative">
+                    <label htmlFor="tag-select" className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5 opacity-70">
                         Etiqueta (Evento)
                     </label>
                     <div className="relative">
                         <select
+                            id="tag-select"
                             value={formData.tagId}
-                            onChange={(e) => setFormData({ ...formData, tagId: e.target.value })}
-                            className="w-full bg-brand-dark border border-brand-border rounded-lg p-3 text-zinc-200 focus:border-brand-gold focus:outline-none focus:ring-1 focus:ring-brand-gold/20 text-sm appearance-none shadow-inner transition-all"
+                            onChange={(e) => {
+                                const selectedTagId = e.target.value;
+                                const selectedEvent = events.find(ev => ev.id === selectedTagId);
+                                const eventPrice = selectedEvent ? selectedEvent.price.toString() : '';
+
+                                setFormData({
+                                    ...formData,
+                                    tagId: selectedTagId,
+                                    value: eventPrice || formData.value
+                                });
+                            }}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-zinc-200 focus:border-brand-gold focus:outline-none focus:ring-1 focus:ring-brand-gold/20 text-sm appearance-none shadow-inner transition-all hover:border-zinc-700"
                         >
                             <option value="">Sem etiqueta</option>
                             {events.map((ev) => (
                                 <option key={ev.id} value={ev.id}>
-                                    {ev.title}
+                                    {ev.title} {ev.price > 0 && `(R$ ${ev.price})`}
                                 </option>
                             ))}
                         </select>
@@ -120,6 +132,6 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                     />
                 </div>
             </div>
-        </Modal>
+        </Modal >
     );
 };

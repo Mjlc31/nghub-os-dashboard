@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { ArrowUpRight, ArrowDownRight, Download, Plus, Loader2, FileText, LayoutDashboard, Trash2 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
@@ -14,8 +15,16 @@ const Finance: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTrans, setNewTrans] = useState({ description: '', amount: '', type: 'income', category: 'Outros' });
+  const location = useLocation();
 
   useEffect(() => { fetchTransactions(); }, []);
+
+  useEffect(() => {
+    if (location.state?.openModal) {
+      setIsModalOpen(true);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const fetchTransactions = async () => {
     try {
