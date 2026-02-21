@@ -205,7 +205,9 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       const selectedEvent = events.find(e => e.id === tagId);
       const newEventPrice = selectedEvent ? selectedEvent.price : 0;
       const currentLead = leads.find(l => l.id === leadId);
-      const finalValueToSave = newEventPrice > 0 ? newEventPrice : (currentLead?.value || 0);
+
+      // If the tag is removed (tagId === ''), reset value to 0. Otherwise use event price or keep current value.
+      const finalValueToSave = tagId === '' ? 0 : (newEventPrice > 0 ? newEventPrice : (currentLead?.value || 0));
 
       const { error } = await supabase.from('leads').update({ tag_id: tagId || null, value: finalValueToSave }).eq('id', leadId);
       if (error) throw error;
