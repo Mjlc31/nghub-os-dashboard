@@ -176,10 +176,10 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const filteredLeads = leads.filter(l => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
-      l.name.toLowerCase().includes(term) ||
-      l.company?.toLowerCase().includes(term) ||
-      l.email?.toLowerCase().includes(term) ||
-      l.phone?.toLowerCase().includes(term);
+      (l.name || '').toLowerCase().includes(term) ||
+      (l.company || '').toLowerCase().includes(term) ||
+      (l.email || '').toLowerCase().includes(term) ||
+      (l.phone || '').toLowerCase().includes(term);
     const matchesTag = selectedTagFilter === 'all' || l.tagId === selectedTagFilter;
     return matchesSearch && matchesTag;
   });
