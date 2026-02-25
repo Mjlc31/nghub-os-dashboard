@@ -174,7 +174,12 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const getEventName = (id?: string) => events.find(e => e.id === id)?.title;
 
   const filteredLeads = leads.filter(l => {
-    const matchesSearch = l.name.toLowerCase().includes(searchTerm.toLowerCase()) || l.company?.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      l.name.toLowerCase().includes(term) ||
+      l.company?.toLowerCase().includes(term) ||
+      l.email?.toLowerCase().includes(term) ||
+      l.phone?.toLowerCase().includes(term);
     const matchesTag = selectedTagFilter === 'all' || l.tagId === selectedTagFilter;
     return matchesSearch && matchesTag;
   });
@@ -535,7 +540,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
           <div className="flex flex-1 md:flex-none items-center bg-brand-surface border border-zinc-800 rounded-xl p-1 gap-1 w-full md:w-auto mt-2 md:mt-0">
             <div className="relative flex-1 md:w-64">
               <Input
-                placeholder="Buscar (Nome ou Empresa)..."
+                placeholder="Buscar (Nome, Email, Tel ou Empresa)..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 icon={<Search className="w-3.5 h-3.5" />}

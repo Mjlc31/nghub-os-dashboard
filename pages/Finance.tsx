@@ -13,11 +13,29 @@ const Finance: React.FC = () => {
   const [filter, setFilter] = useState('all');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isListLoading, setIsListLoading] = useState(true);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const ITEMS_PER_PAGE = 20;
+
+  // Global array just for lightweight metric calculations
+  const [allDataList, setAllDataList] = useState<{ amount: number, type: string, category: string, date: string, status: string }[]>([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTrans, setNewTrans] = useState({ description: '', amount: '', type: 'income', category: 'Outros' });
   const location = useLocation();
 
-  useEffect(() => { fetchTransactions(); }, []);
+  useEffect(() => { fetchAllData(); }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]); // Reset page to 1 when filter changes
+
+  useEffect(() => {
+    fetchPaginatedTransactions();
+  }, [currentPage, filter]);
 
   useEffect(() => {
     if (location.state?.openModal) {
@@ -26,15 +44,38 @@ const Finance: React.FC = () => {
     }
   }, [location]);
 
-  const fetchTransactions = async () => {
+  const fetchAllData = async () => {
     try {
-      const { data, error } = await supabase.from('transactions').select('*').order('date', { ascending: false });
+      const { data, error } = await supabase.from('transactions').select('amount, type, category, date, status');
       if (error) throw error;
-      setTransactions(data || []);
+      setAllDataList(data || []);
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
-  const filteredTransactions = transactions.filter(t => filter === 'all' ? true : t.type === filter);
+  const fetchPaginatedTransactions = async () => {
+    try {
+      setIsListLoading(true);
+
+      let query = supabase.from('transactions').select('*', { count: 'exact' });
+      if (filter !== 'all') {
+        query = query.eq('type', filter);
+      }
+
+      const start = (currentPage - 1) * ITEMS_PER_PAGE;
+      const end = start + ITEMS_PER_PAGE - 1;
+
+      const { data, count, error } = await query
+        .order('date', { ascending: false })
+        .range(start, end);
+
+      if (error) throw error;
+
+      setTransactions(data || []);
+      setTotalPages(Math.ceil((count || 0) / ITEMS_PER_PAGE) || 1);
+    } catch (error) { console.error(error); } finally { setIsListLoading(false); }
+  };
+
+  const filteredTransactions = transactions;
 
   const handleDeleteTransaction = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -42,7 +83,8 @@ const Finance: React.FC = () => {
     try {
       const { error } = await supabase.from('transactions').delete().eq('id', id);
       if (error) throw error;
-      setTransactions(current => current.filter(t => t.id !== id));
+      fetchAllData();
+      fetchPaginatedTransactions();
     } catch (err) { alert('Erro ao excluir transação.'); }
   };
 
@@ -55,15 +97,16 @@ const Finance: React.FC = () => {
       ]).select();
       if (error) throw error;
       if (data) {
-        setTransactions([data[0], ...transactions]);
         setIsModalOpen(false);
         setNewTrans({ description: '', amount: '', type: 'income', category: 'Outros' });
+        fetchAllData();
+        fetchPaginatedTransactions();
       }
     } catch (error) { console.error(error); }
   };
 
-  const incomeTotal = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
-  const expenseTotal = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
+  const incomeTotal = allDataList.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
+  const expenseTotal = allDataList.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
   const balance = incomeTotal - expenseTotal;
 
   const generateDRE = () => {
@@ -73,7 +116,7 @@ const Finance: React.FC = () => {
     const totalExpenses = expenseTotal;
     const operatingProfit = netIncome - totalExpenses;
     const groupedExpenses: Record<string, number> = {};
-    transactions.filter(t => t.type === 'expense').forEach(t => { groupedExpenses[t.category] = (groupedExpenses[t.category] || 0) + Number(t.amount); });
+    allDataList.filter(t => t.type === 'expense').forEach(t => { groupedExpenses[t.category] = (groupedExpenses[t.category] || 0) + Number(t.amount); });
     return { grossIncome, taxes, netIncome, groupedExpenses, totalExpenses, operatingProfit };
   };
   const dreData = generateDRE();
@@ -125,7 +168,7 @@ const Finance: React.FC = () => {
             <div className="bg-brand-surface border border-brand-border rounded-xl flex flex-col">
               <div className="p-6 border-b border-brand-border flex justify-between items-center"><h3 className="font-serif font-semibold text-white">Transações Recentes</h3><div className="flex gap-2"><button onClick={() => setFilter('all')} className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded ${filter === 'all' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}>Todos</button><button onClick={() => setFilter('income')} className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded ${filter === 'income' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}>Entradas</button><button onClick={() => setFilter('expense')} className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded ${filter === 'expense' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}>Saídas</button></div></div>
               <div className="flex-1 overflow-y-auto max-h-[300px] custom-scrollbar p-4">
-                {loading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-brand-gold" /></div> : filteredTransactions.length === 0 ? <div className="text-center py-10 text-zinc-500 text-sm">Nenhuma transação encontrada.</div> : filteredTransactions.map((t) => (
+                {isListLoading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-brand-gold" /></div> : filteredTransactions.length === 0 ? <div className="text-center py-10 text-zinc-500 text-sm">Nenhuma transação encontrada.</div> : filteredTransactions.map((t) => (
                   <div key={t.id} className="flex items-center justify-between p-3 hover:bg-zinc-800/50 rounded-lg transition-colors group cursor-pointer border border-transparent hover:border-zinc-800">
                     <div className="flex items-center gap-4">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center ${t.type === 'income' ? 'bg-brand-gold/10 text-brand-gold' : 'bg-red-900/20 text-red-400'}`}>{t.type === 'income' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}</div>
@@ -138,6 +181,31 @@ const Finance: React.FC = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="p-4 border-t border-brand-border flex items-center justify-between bg-zinc-900/40 rounded-b-xl">
+                  <span className="text-xs text-zinc-500 font-medium">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1 || isListLoading}
+                      className="px-3 py-1 rounded border border-zinc-800 text-xs font-medium text-zinc-400 disabled:opacity-30 hover:bg-zinc-800"
+                    >
+                      Anterior
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages || isListLoading}
+                      className="px-3 py-1 rounded border border-zinc-800 text-xs font-medium text-zinc-400 disabled:opacity-30 hover:bg-zinc-800"
+                    >
+                      Próximo
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </>
