@@ -8,7 +8,7 @@ import CRM from './pages/CRM';
 import Events from './pages/Events';
 import Academy from './pages/Academy';
 import Finance from './pages/Finance';
-import Messaging from './pages/Messaging';
+import Conversas from './pages/Conversas';
 import Settings from './pages/Settings';
 import Toast, { ToastMessage, ToastType } from './components/ui/Toast';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -42,7 +42,7 @@ const App: React.FC = () => {
               <Route path="/events" element={<Events onNotify={addToast} />} />
               <Route path="/academy" element={<Academy />} />
               <Route path="/finance" element={<Finance />} />
-              <Route path="/messaging" element={<Messaging onNotify={addToast} />} />
+              <Route path="/messaging" element={<Conversas onNotify={addToast} />} />
               <Route path="/settings" element={<Settings onNotify={addToast} />} />
             </Route>
           </Route>

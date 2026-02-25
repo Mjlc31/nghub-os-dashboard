@@ -26,7 +26,7 @@ const NAV_ITEMS = [
   { icon: Calendar, label: 'Eventos', path: '/events' },
   { icon: GraduationCap, label: 'Academy', path: '/academy' },
   { icon: DollarSign, label: 'Financeiro', path: '/finance' },
-  { icon: MessageSquare, label: 'Mensagens', path: '/messaging' },
+  { icon: MessageSquare, label: 'Conversas', path: '/messaging' },
   { icon: Settings, label: 'Configurações', path: '/settings' },
 ];
 
