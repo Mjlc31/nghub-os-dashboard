@@ -16,6 +16,7 @@ import { ImportLeadsModal } from '../components/crm/ImportLeadsModal';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
+import { Skeleton } from '../components/ui/Skeleton';
 
 interface CRMProps {
   onNotify: (type: 'success' | 'error' | 'info', msg: string) => void;
@@ -590,7 +591,21 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       {/* MOBILE: Optimized Vertical List */}
       <div className="md:hidden flex-1 space-y-3 pb-32">
         {loading ? (
-          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-brand-gold" /></div>
+          <div className="space-y-4 px-2 pt-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="relative overflow-hidden rounded-xl p-4 border bg-zinc-900 border-zinc-800">
+                <div className="flex justify-between items-center mb-3">
+                  <Skeleton className="h-5 w-1/2 !bg-zinc-800" />
+                  <Skeleton className="h-4 w-12 !bg-zinc-800" />
+                </div>
+                <Skeleton className="h-4 w-1/3 mb-4 !bg-zinc-800" />
+                <div className="flex justify-between items-center pt-3 border-t border-zinc-800/50">
+                  <Skeleton className="h-4 w-20 !bg-zinc-800" />
+                  <Skeleton className="h-4 w-4 rounded-full !bg-zinc-800" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : filteredLeads.filter(l => l.stage === activeMobileStage).length === 0 ? (
           <div className="text-center py-20 text-zinc-500 bg-zinc-900/30 rounded-xl border border-dashed border-zinc-800 flex flex-col items-center justify-center animate-fade-in">
             <Briefcase className="w-10 h-10 mb-3 opacity-20" />

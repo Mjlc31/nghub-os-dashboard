@@ -13,6 +13,7 @@ import { RevenueChart } from '../components/dashboard/RevenueChart';
 import { SalesFunnel } from '../components/dashboard/SalesFunnel';
 import { RecentActivity } from '../components/dashboard/RecentActivity';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { Skeleton } from '../components/ui/Skeleton';
 
 interface DashboardProps {
   onNavigate: (view: string) => void;
@@ -26,7 +27,77 @@ const Dashboard: React.FC = () => {
     navigate(path, { state: { openModal } });
   };
 
-  if (loading) return <div className="flex justify-center items-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-brand-gold"></div></div>;
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-[1600px] mx-auto animate-fade-in">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <Skeleton className="h-10 w-48 mb-2 !rounded-md" />
+            <Skeleton className="h-4 w-64 !rounded-md" />
+          </div>
+          <Skeleton className="h-8 w-32 !rounded-lg" />
+        </div>
+
+        {/* KPI Grid Skeletons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-brand-surface border border-brand-border rounded-xl p-6">
+              <Skeleton className="h-4 w-24 mb-4" />
+              <Skeleton className="h-8 w-32 mb-2" />
+              <div className="flex justify-between items-end">
+                <Skeleton className="h-3 w-40" />
+                <Skeleton className="h-10 w-10 !rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Bento Grid Skeletons */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[450px]">
+          <div className="lg:col-span-2 bg-brand-surface border border-brand-border p-6 rounded-2xl flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-8 w-24 !rounded-lg" />
+            </div>
+            <Skeleton className="flex-1 w-full" />
+          </div>
+          <div className="bg-brand-surface border border-brand-border p-6 rounded-2xl flex flex-col">
+            <Skeleton className="h-6 w-32 mb-6" />
+            <div className="flex flex-col flex-1 gap-2 justify-center">
+              {[1, 2, 3, 4].map(i => (
+                <React.Fragment key={i}>
+                  <Skeleton className={`h-12 w-${[100, 80, 60, 40][i - 1]}% mx-auto`} />
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Section Skeletons */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-brand-surface border border-brand-border p-6 rounded-2xl">
+            <Skeleton className="h-6 w-40 mb-6" />
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="flex gap-4 items-center">
+                  <Skeleton className="h-10 w-10 !rounded-full shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-full w-full !bg-brand-surface border-brand-border" />
+            <Skeleton className="h-full w-full !bg-brand-surface border-brand-border" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in max-w-[1600px] mx-auto">

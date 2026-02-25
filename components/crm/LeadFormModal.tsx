@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User, Building, Briefcase, Mail, Phone, DollarSign, ChevronDown } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { Event } from '../../types';
@@ -39,6 +39,17 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     team,
     isSubmitting = false,
 }) => {
+    const [errors, setErrors] = useState<{ name?: string }>({});
+
+    const handleSave = () => {
+        if (!formData.name.trim()) {
+            setErrors({ name: 'O nome é obrigatório' });
+            return;
+        }
+        setErrors({});
+        onSave();
+    };
+
     return (
         <Modal
             isOpen={isOpen}
@@ -49,7 +60,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                     <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
                         Cancelar
                     </Button>
-                    <Button variant="primary" onClick={onSave} disabled={isSubmitting}>
+                    <Button variant="primary" onClick={handleSave} disabled={isSubmitting}>
                         {isSubmitting ? (
                             <>
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -64,10 +75,14 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
         >
             <div className="space-y-4">
                 <Input
-                    label="Nome Completo"
+                    label="Nome Completo *"
                     icon={<User className="w-4 h-4" />}
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                        setFormData({ ...formData, name: e.target.value });
+                        if (errors.name) setErrors({});
+                    }}
+                    error={errors.name}
                 />
 
                 <div className="grid grid-cols-2 gap-4">

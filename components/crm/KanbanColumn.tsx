@@ -1,7 +1,7 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
 import { Lead, LeadStage } from '../../types';
 import { LeadCard } from './LeadCard';
+import { Skeleton } from '../ui/Skeleton';
 
 interface KanbanColumnProps {
     stage: LeadStage;
@@ -63,7 +63,24 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             {/* Cards List */}
             <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
                 {loading && leads.length === 0 ? (
-                    <Loader2 className="animate-spin mx-auto text-brand-gold mt-4" />
+                    <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="p-4 rounded-xl border border-zinc-800/40 bg-zinc-900/60 relative overflow-hidden">
+                                {/* Header Skeletons */}
+                                <div className="flex gap-2 mb-3">
+                                    <Skeleton className="h-4 w-16 !bg-zinc-800 rounded-md" />
+                                    <Skeleton className="h-4 w-12 !bg-zinc-800 rounded-md" />
+                                </div>
+                                {/* Main Skeletons */}
+                                <Skeleton className="h-4 w-3/4 mb-2 !rounded-md" />
+                                <Skeleton className="h-3 w-1/2 mb-4 !rounded-md" />
+                                {/* Footer Skeleton */}
+                                <div className="pt-3 border-t border-zinc-800/30">
+                                    <Skeleton className="h-3 w-1/3 !rounded-md" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 ) : (
                     leads.map((lead) => (
                         <LeadCard
