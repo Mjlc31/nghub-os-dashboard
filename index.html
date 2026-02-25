@@ -1,75 +1,117 @@
 <!DOCTYPE html>
 <html lang="pt-BR" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NGHUB OS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
-            },
-            colors: {
-              brand: {
-                gold: '#D4AF37', // Metallic Gold
-                dark: '#09090b', // Zinc-950
-                surface: '#18181b', // Zinc-900
-                border: '#27272a', // Zinc-800
-              }
-            },
-            animation: {
-              'fade-in': 'fadeIn 0.3s ease-out',
-            },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              }
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NGHUB OS - Gestão de Alta Performance</title>
+  <meta name="description"
+    content="A plataforma definitiva de CRM, Financeiro e Gestão de Eventos (Silicon Valley Standard) da NGHUB." />
+  <meta name="theme-color" content="#050505" />
+
+  <!-- Open Graph / Meta Social -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="NGHUB OS - Alta Performance" />
+  <meta property="og:description"
+    content="Plataforma de Alta Performance para gestão de leads, clientes e corporativo." />
+  <!-- <meta property="og:image" content="https://seusite.com/og-image.jpg" /> -->
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="NGHUB OS" />
+  <meta name="twitter:description" content="Gestão de Alta Performance para o ecossistema NGHUB." />
+
+  <!-- Google Analytics 4 (GA4) -->
+  <!-- 
+      Para ativar, copie o seu Measurement ID (G-XXXXXXXXXX) e descomente este bloco.
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX');
+      </script>
+    -->
+
+  <!-- Plausible Analytics (Alternativa Leve e focada em Privacidade) -->
+  <!-- <script defer data-domain="oseusite.com.br" src="https://plausible.io/js/script.js"></script> -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              gold: '#D4AF37', // Metallic Gold
+              dark: '#09090b', // Zinc-950
+              surface: '#18181b', // Zinc-900
+              border: '#27272a', // Zinc-800
             }
           },
+          animation: {
+            'fade-in': 'fadeIn 0.3s ease-out',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0', transform: 'translateY(10px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            }
+          }
         },
-      }
-    </script>
-    <style>
-      body {
-        background-color: #050505; /* Deeper black */
-        color: #e4e4e7;
-        font-family: 'Inter', sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-      }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #27272a; 
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #3f3f46; 
-      }
-      
-      /* Input resets */
-      input, select, textarea {
-        background-color: transparent;
-      }
-    </style>
+      },
+    }
+  </script>
+  <style>
+    body {
+      background-color: #050505;
+      /* Deeper black */
+      color: #e4e4e7;
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
 
-<link rel="stylesheet" href="/index.css">
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3f3f46;
+    }
+
+    /* Input resets */
+    input,
+    select,
+    textarea {
+      background-color: transparent;
+    }
+  </style>
+
+  <link rel="stylesheet" href="/index.css">
 </head>
-  <body>
-    <div id="root"></div>
+
+<body>
+  <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
+
 </html>

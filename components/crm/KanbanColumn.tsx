@@ -15,6 +15,7 @@ interface KanbanColumnProps {
     // Helper functions passed down for presentation logic
     getTagStyle: (tagId?: string) => { bg: string; border: string; text: string } | null;
     getEventName: (id?: string) => string | undefined;
+    onWhatsAppClick: (phone: string) => void;
     isBulkMode?: boolean;
     selectedLeadIds?: string[];
     onToggleSelect?: (id: string) => void;

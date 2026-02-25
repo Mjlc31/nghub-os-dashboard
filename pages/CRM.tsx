@@ -5,7 +5,7 @@ import {
   MoreHorizontal, Plus, Search, Filter, Phone, Calendar, ArrowRight,
   Save, MessageCircle, Loader2, UserPlus, Upload, FileSpreadsheet,
   Download, Trash2, Settings, CheckCircle, Mail, ChevronRight, Briefcase, ChevronDown, Tag, Edit2,
-  X, MoveRight, MoveLeft, DollarSign
+  X, MoveRight, MoveLeft, DollarSign, Circle
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { supabase } from '../lib/supabase';
@@ -42,7 +42,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
 
   // Mobile State
-  const [activeMobileStage, setActiveMobileStage] = useState<LeadStage>(LeadStage.NEW_LEAD);
+  const [activeMobileStage, setActiveMobileStage] = useState<LeadStage>(LeadStage.DRAFT);
   const [mobileActionLead, setMobileActionLead] = useState<Lead | null>(null); // Lead selecionado para o menu bottom sheet
 
   const location = useLocation();
@@ -57,6 +57,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
 
   // Initial stage names config
   const defaultStageNames = {
+    [LeadStage.DRAFT]: 'Rascunhos',
     [LeadStage.NEW_LEAD]: 'Novo Lead',
     [LeadStage.QUALIFIED]: 'Qualificado',
     [LeadStage.NEGOTIATION]: 'Em Negociação',
@@ -85,6 +86,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const [newSellerForm, setNewSellerForm] = useState({ name: '', phone: '' });
 
   const [importing, setImporting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const stageKeys = Object.values(LeadStage);
@@ -95,8 +97,16 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     fetchLeads();
     const savedStages = localStorage.getItem('nghub_crm_stages');
     if (savedStages) {
-      setStageNames(JSON.parse(savedStages));
-      setTempStageNames(JSON.parse(savedStages));
+      try {
+        const parsed = JSON.parse(savedStages);
+        const merged = { ...defaultStageNames, ...parsed };
+        // Garante que a nova etapa de Rascunho seja incluída mesmo em caches antigos
+        if (!parsed[LeadStage.DRAFT]) merged[LeadStage.DRAFT] = defaultStageNames[LeadStage.DRAFT];
+        setStageNames(merged);
+        setTempStageNames(merged);
+      } catch (e) {
+        // Se der erro no parse, usa o default
+      }
     }
   }, []);
 
@@ -136,7 +146,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         tagId: l.tag_id,
         ownerId: l.owner_id,
         owner: l.owner ? { id: l.owner_id, name: l.owner.name, phone: l.owner.phone } : undefined,
-        createdAt: l.created_at
+        createdAt: l.created_at,
+        instagram: l.instagram,
+        revenue_text: l.revenue_text,
+        headcount: l.headcount,
+        pain_point: l.pain_point,
+        origin: l.origin,
+        notes: l.notes
       }));
 
       setLeads(mappedLeads);
@@ -170,7 +186,11 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const handleDrop = async (e: React.DragEvent, targetStage: LeadStage) => {
     e.preventDefault();
     const id = e.dataTransfer.getData('leadId');
-    await updateLeadStage(id, targetStage);
+    if (isBulkMode && selectedLeadIds.includes(id)) {
+      await handleBulkMove(targetStage);
+    } else {
+      await updateLeadStage(id, targetStage);
+    }
   };
 
   // Shared Logic for Stage Update
@@ -253,6 +273,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
 
   const handleAddLead = async () => {
     if (!newLeadForm.name) return onNotify('error', 'O nome é obrigatório.');
+    setIsSubmitting(true);
     try {
       const selectedEvent = newLeadForm.tagId ? events.find(e => e.id === newLeadForm.tagId) : null;
       const initialValue = selectedEvent?.price && selectedEvent.price > 0
@@ -273,13 +294,15 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
 
       if (error) throw error;
 
-      const createdLead = data[0];
-
       onNotify('success', 'Lead adicionado!');
       setIsAddModalOpen(false);
       setNewLeadForm({ name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '', ownerId: '' });
       fetchLeads();
-    } catch (err) { onNotify('error', 'Erro ao salvar lead.'); }
+    } catch (err) {
+      onNotify('error', 'Erro ao salvar lead.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleUpdateLeadOwner = async (leadId: string, ownerId: string) => {
@@ -338,6 +361,64 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       setBulkOwnerId('');
     } catch (err) { onNotify('error', 'Erro ao atribuir leads em lote.'); }
   };
+
+  const handleBulkMove = async (targetStage: LeadStage) => {
+    if (selectedLeadIds.length === 0) return onNotify('error', 'Nenhum lead selecionado.');
+
+    try {
+      const { error } = await supabase.from('leads')
+        .update({ stage: targetStage })
+        .in('id', selectedLeadIds);
+
+      if (error) throw error;
+
+      setLeads(leads.map(l => selectedLeadIds.includes(l.id) ? { ...l, stage: targetStage } : l));
+      onNotify('success', `${selectedLeadIds.length} leads movidos para ${stageNames[targetStage]}!`);
+
+      setIsBulkMode(false);
+      setSelectedLeadIds([]);
+    } catch (err) { onNotify('error', 'Erro ao mover leads em lote.'); }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedLeadIds.length === 0) return onNotify('error', 'Nenhum lead selecionado.');
+    if (!window.confirm(`Tem certeza que deseja excluir ${selectedLeadIds.length} leads permanentemente?`)) return;
+
+    try {
+      const { error } = await supabase.from('leads')
+        .delete()
+        .in('id', selectedLeadIds);
+
+      if (error) throw error;
+
+      setLeads(leads.filter(l => !selectedLeadIds.includes(l.id)));
+      onNotify('success', `${selectedLeadIds.length} leads excluídos!`);
+
+      setIsBulkMode(false);
+      setSelectedLeadIds([]);
+    } catch (err) {
+      console.error('Delete error:', err);
+      onNotify('error', 'Erro ao excluir leads em lote.');
+    }
+  };
+
+  const handleDeleteLead = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este lead permanentemente?')) return;
+    try {
+      const { error } = await supabase.from('leads').delete().eq('id', id);
+      if (error) throw error;
+      setLeads(leads.filter(l => l.id !== id));
+      if (selectedLead?.id === id) {
+        setIsDetailModalOpen(false);
+        setSelectedLead(null);
+      }
+      onNotify('success', 'Lead excluído com sucesso!');
+    } catch (err) {
+      console.error('Delete error:', err);
+      onNotify('error', 'Erro ao excluir lead.');
+    }
+  };
+
 
   const handleAddSeller = async () => {
     if (!newSellerForm.name || !newSellerForm.phone) return onNotify('error', 'Nome e telefone (WhatsApp) são obrigatórios.');
@@ -524,15 +605,28 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
                 key={lead.id}
                 className={`
                     relative overflow-hidden rounded-xl p-4 border shadow-sm transition-all animate-fade-in bg-zinc-900 border-zinc-800
-                    active:scale-[0.99]
+                    active:scale-[0.99] ${selectedLeadIds.includes(lead.id) ? 'bg-brand-gold/10 border-brand-gold/50' : ''}
                  `}
-                onClick={() => setMobileActionLead(lead)}
+                onClick={() => {
+                  if (isBulkMode) {
+                    setSelectedLeadIds(prev => prev.includes(lead.id) ? prev.filter(l => l !== lead.id) : [...prev, lead.id]);
+                  } else {
+                    setMobileActionLead(lead);
+                  }
+                }}
               >
                 {style && <div className={`absolute left-0 top-0 bottom-0 w-1 ${style.bg.replace('/10', '')}`}></div>}
 
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1 pr-10">
-                    <h4 className="text-white font-bold text-base leading-tight mb-1">{lead.name}</h4>
+                    <h4 className="text-white font-bold text-base leading-tight mb-1 flex justify-between items-start">
+                      <span className="truncate pr-4">{lead.name}</span>
+                      {isBulkMode && (
+                        <div className="text-zinc-500">
+                          {selectedLeadIds.includes(lead.id) ? <CheckCircle className="w-5 h-5 text-brand-gold" /> : <Circle className="w-5 h-5" />}
+                        </div>
+                      )}
+                    </h4>
                     <p className="text-zinc-400 text-xs flex items-center gap-1.5">
                       {lead.company || 'Sem empresa'}
                       {lead.sector && <span className="text-zinc-600">•</span>}
@@ -648,7 +742,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
               >
                 <Edit2 className="w-4 h-4" /> Ver Detalhes
               </button>
-              <button className="text-sm font-medium text-red-500 hover:text-red-400 flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-red-500/10 transition-colors">
+              <button
+                onClick={() => {
+                  handleDeleteLead(mobileActionLead.id);
+                  setMobileActionLead(null);
+                }}
+                className="text-sm font-medium text-red-500 hover:text-red-400 flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-red-500/10 transition-colors"
+              >
                 <Trash2 className="w-4 h-4" /> Excluir
               </button>
             </div>
@@ -680,6 +780,11 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
                 onWhatsAppClick={openWhatsApp}
                 getTagStyle={getTagStyle}
                 getEventName={getEventName}
+                isBulkMode={isBulkMode}
+                selectedLeadIds={selectedLeadIds}
+                onToggleSelect={(id) => {
+                  setSelectedLeadIds(prev => prev.includes(id) ? prev.filter(lId => lId !== id) : [...prev, id]);
+                }}
               />
             );
           })}
@@ -701,6 +806,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         setFormData={setNewLeadForm}
         events={events}
         team={team}
+        isSubmitting={isSubmitting}
       />
 
       {/* Edit Stages Modal */}
@@ -826,9 +932,70 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              {selectedLead.origin && (
+                <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Origem</span>
+                  <span className="text-sm text-zinc-300">{selectedLead.origin}</span>
+                </div>
+              )}
+              {selectedLead.instagram && (
+                <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Instagram</span>
+                  <a href={`https://instagram.com/${selectedLead.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-gold hover:underline">
+                    {selectedLead.instagram}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              {selectedLead.headcount && (
+                <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Tamanho da Equipe</span>
+                  <span className="text-sm text-zinc-300">{selectedLead.headcount}</span>
+                </div>
+              )}
+              {selectedLead.revenue_text && (
+                <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
+                  <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Faturamento</span>
+                  <span className="text-sm text-zinc-300">{selectedLead.revenue_text}</span>
+                </div>
+              )}
+            </div>
+
+            {selectedLead.pain_point && (
+              <div className="mt-2 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
+                <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Desafios / Pain Point</span>
+                <p className="text-sm text-zinc-300 whitespace-pre-wrap">{selectedLead.pain_point}</p>
+              </div>
+            )}
+
+            <div className="mt-4 pt-4 border-t border-zinc-800">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-2">Anotações</span>
+              <textarea
+                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-zinc-200 focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20 custom-scrollbar text-sm min-h-[100px] resize-y"
+                placeholder="Insira anotações sobre esse lead..."
+                value={selectedLead.notes || ''}
+                onChange={async (e) => {
+                  const val = e.target.value;
+                  setSelectedLead({ ...selectedLead, notes: val });
+                  // Em produção seria melhor um debounce, mas para este caso:
+                  setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, notes: val } : l));
+                  await supabase.from('leads').update({ notes: val }).eq('id', selectedLead.id);
+                }}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800">
               <button onClick={() => openWhatsApp(selectedLead.phone)} className="flex items-center justify-center gap-2 bg-green-900/20 text-green-500 p-3 rounded-lg border border-green-900/30 font-bold text-sm hover:bg-green-900/30 transition-colors"><MessageCircle className="w-4 h-4" /> WhatsApp</button>
               <button onClick={() => openEmail(selectedLead.email)} className="flex items-center justify-center gap-2 bg-zinc-800 text-white p-3 rounded-lg border border-zinc-700 font-bold text-sm hover:bg-zinc-700 transition-colors"><Mail className="w-4 h-4" /> Email</button>
+            </div>
+
+            <div className="pt-2">
+              <Button onClick={() => handleDeleteLead(selectedLead.id)} variant="ghost" className="w-full text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-red-500/20">
+                <Trash2 className="w-4 h-4 mr-2" /> Excluir Lead
+              </Button>
             </div>
           </div>
         )}
@@ -846,13 +1013,34 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
               value={bulkOwnerId}
               onChange={(e) => setBulkOwnerId(e.target.value)}
               options={[
-                { value: '', label: 'Escolha um responsável...' },
+                { value: '', label: 'Atribuir a...' },
                 ...team.map(member => ({ value: member.id, label: member.name }))
               ]}
             />
-            <Button onClick={handleBulkAssign} variant="primary" size="md" className="whitespace-nowrap px-6">
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Salvar e Notificar
+            {bulkOwnerId && (
+              <Button onClick={handleBulkAssign} variant="primary" size="md" className="whitespace-nowrap px-4">
+                Atribuir
+              </Button>
+            )}
+
+            <div className="w-px h-8 bg-zinc-800 mx-2 hidden sm:block"></div>
+
+            <Select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) handleBulkMove(e.target.value as LeadStage);
+              }}
+              options={[
+                { value: '', label: 'Mover para...' },
+                ...stageKeys.map(k => ({ value: k, label: stageNames[k] }))
+              ]}
+            />
+
+            <div className="w-px h-8 bg-zinc-800 mx-2 hidden sm:block"></div>
+
+            <Button onClick={handleBulkDelete} variant="ghost" size="md" className="whitespace-nowrap text-red-500 hover:bg-red-500/10 border border-red-500/20 px-4">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir
             </Button>
           </div>
         </div>

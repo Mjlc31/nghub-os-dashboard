@@ -5,6 +5,7 @@ import { Event } from '../../types';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
+import { Loader2 } from 'lucide-react';
 
 interface LeadFormState {
     name: string;
@@ -25,6 +26,7 @@ interface LeadFormModalProps {
     setFormData: (data: LeadFormState) => void;
     events: Event[];
     team: { id: string; name: string }[];
+    isSubmitting?: boolean;
 }
 
 export const LeadFormModal: React.FC<LeadFormModalProps> = ({
@@ -35,6 +37,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     setFormData,
     events,
     team,
+    isSubmitting = false,
 }) => {
     return (
         <Modal
@@ -43,11 +46,18 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
             title="Novo Lead"
             footer={
                 <>
-                    <Button variant="ghost" onClick={onClose}>
+                    <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
                         Cancelar
                     </Button>
-                    <Button variant="primary" onClick={onSave}>
-                        Salvar
+                    <Button variant="primary" onClick={onSave} disabled={isSubmitting}>
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Salvando...
+                            </>
+                        ) : (
+                            'Salvar'
+                        )}
                     </Button>
                 </>
             }

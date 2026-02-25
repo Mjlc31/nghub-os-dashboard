@@ -1,5 +1,6 @@
 
 export enum LeadStage {
+  DRAFT = 'Rascunho Em Andamento',
   NEW_LEAD = 'Novo Lead',
   QUALIFIED = 'Qualificado',
   NEGOTIATION = 'Em Negociação',
@@ -39,6 +40,12 @@ export interface Lead {
   ownerId?: string;
   owner?: Seller;
   createdAt?: string;
+  instagram?: string;
+  revenue_text?: string;
+  headcount?: string;
+  pain_point?: string;
+  origin?: string;
+  notes?: string;
 }
 
 export interface Event {
