@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { ArrowUpRight, ArrowDownRight, LucideIcon } from 'lucide-react';
 
 interface KPICardProps {
@@ -11,7 +11,7 @@ interface KPICardProps {
     onClick?: () => void;
 }
 
-export const KPICard: React.FC<KPICardProps> = ({
+const KPICardComponent: React.FC<KPICardProps> = ({
     title,
     value,
     subtitle,
@@ -59,3 +59,5 @@ export const KPICard: React.FC<KPICardProps> = ({
         </div>
     </div>
 );
+
+export const KPICard = memo(KPICardComponent);

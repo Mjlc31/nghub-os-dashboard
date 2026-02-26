@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { DollarSign, Users, Activity } from 'lucide-react';
 
 interface ActivityItem {
@@ -32,7 +32,7 @@ const formatRelativeDate = (dateStr: string): string => {
     }
 };
 
-export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) => {
+const RecentActivityComponent: React.FC<RecentActivityProps> = ({ activities }) => {
     return (
         <div className="bg-brand-surface border border-brand-border rounded-xl p-6 flex flex-col">
             <div className="flex items-center justify-between mb-5">
@@ -49,9 +49,9 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) =>
                         <p className="text-sm">Nenhuma atividade recente.</p>
                     </div>
                 ) : (
-                    activities.map((item, i) => (
+                    activities.map((item) => (
                         <div
-                            key={i}
+                            key={`${item.date}-${item.title}`}
                             className="flex items-center justify-between py-3 border-b border-brand-border/50 last:border-0 hover:bg-zinc-800/20 px-2 rounded-lg transition-colors -mx-2 group"
                         >
                             <div className="flex items-center gap-3">
@@ -91,3 +91,5 @@ export const RecentActivity: React.FC<RecentActivityProps> = ({ activities }) =>
         </div>
     );
 };
+
+export const RecentActivity = memo(RecentActivityComponent);

@@ -1,6 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { LeadStage } from '../types';
+
+// ── Local types used by the dashboard hook ──────────────────────────────────
+export interface ChartDataPoint { name: string; value: number; }
+export interface FunnelDataPoint { name: string; value: number; }
+export interface ActivityItem {
+    type: 'finance' | 'lead';
+    title: string;
+    value: string;
+    date: string;
+    status: 'success' | 'danger' | 'neutral';
+}
+
+interface TransactionRow { type: string; amount: number; description: string; date: string; }
+interface LeadRow { stage: string; name: string; created_at: string; }
+interface UpcomingEventRow { date: string; title: string; }
 
 export const useDashboardData = () => {
     const [loading, setLoading] = useState(true);
@@ -14,15 +29,15 @@ export const useDashboardData = () => {
         nextEventDays: 'N/A',
         nextEventName: ''
     });
-    const [chartData, setChartData] = useState<any[]>([]);
-    const [funnelData, setFunnelData] = useState<any[]>([]);
-    const [recentActivity, setRecentActivity] = useState<any[]>([]);
+    const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+    const [funnelData, setFunnelData] = useState<FunnelDataPoint[]>([]);
+    const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
 
     useEffect(() => {
         fetchDashboardData();
     }, []);
 
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = useCallback(async () => {
         try {
             const [
                 { data: trans },
@@ -37,13 +52,13 @@ export const useDashboardData = () => {
             ]);
 
             // 1. Financeiro (Transactions)
-            const transactions = trans || [];
-            const revenue = transactions.filter((t: any) => t.type === 'income').reduce((acc: number, curr: any) => acc + Number(curr.amount), 0);
-            const expenses = transactions.filter((t: any) => t.type === 'expense').reduce((acc: number, curr: any) => acc + Number(curr.amount), 0);
+            const transactions: TransactionRow[] = trans || [];
+            const revenue = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + Number(curr.amount), 0);
+            const expenses = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0);
 
             // Preparar dados para o gráfico de fluxo
             const chartMap: Record<string, number> = {};
-            transactions.forEach((t: any) => {
+            transactions.forEach(t => {
                 const date = new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
                 const val = t.type === 'income' ? Number(t.amount) : -Number(t.amount);
                 chartMap[date] = (chartMap[date] || 0) + val;
@@ -51,7 +66,7 @@ export const useDashboardData = () => {
             const chart = Object.keys(chartMap).slice(-7).map(key => ({ name: key, value: chartMap[key] }));
 
             // 2. CRM (Leads)
-            const leadsList = leads || [];
+            const leadsList: LeadRow[] = leads || [];
             const totalLeads = leadsList.length;
 
             // Get Custom Stage Names from LocalStorage or use Default
@@ -65,13 +80,13 @@ export const useDashboardData = () => {
             };
 
             // Calculate conversion
-            const wonLeads = leadsList.filter((l: any) => l.stage === LeadStage.WON || l.stage === 'Membro Ativo').length;
+            const wonLeads = leadsList.filter(l => l.stage === LeadStage.WON || l.stage === 'Membro Ativo').length;
 
             // Funnel Data
             const stages = [LeadStage.NEW_LEAD, LeadStage.QUALIFIED, LeadStage.NEGOTIATION, LeadStage.WON];
-            const funnel = stages.map(stageKey => ({
+            const funnel: FunnelDataPoint[] = stages.map(stageKey => ({
                 name: stageMap[stageKey],
-                value: leadsList.filter((l: any) => l.stage === stageKey || (stageKey === LeadStage.WON && l.stage === 'Membro Ativo')).length
+                value: leadsList.filter(l => l.stage === stageKey || (stageKey === LeadStage.WON && l.stage === 'Membro Ativo')).length
             }));
 
             // 3. Eventos
@@ -88,15 +103,15 @@ export const useDashboardData = () => {
             }
 
             // 4. Atividade Recente
-            const activity = [
-                ...transactions.slice(-3).map((t: any) => ({
+            const activity: ActivityItem[] = [
+                ...transactions.slice(-3).map(t => ({
                     type: 'finance' as const,
                     title: t.description,
                     value: `R$ ${t.amount}`,
                     date: t.date,
                     status: (t.type === 'income' ? 'success' : 'danger') as 'success' | 'danger'
                 })),
-                ...leadsList.slice(-3).map((l: any) => ({
+                ...leadsList.slice(-3).map(l => ({
                     type: 'lead' as const,
                     title: `Novo Lead: ${l.name}`,
                     value: stageMap[l.stage] || l.stage,
@@ -124,7 +139,7 @@ export const useDashboardData = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     return { loading, kpis, chartData, funnelData, recentActivity };
 };
