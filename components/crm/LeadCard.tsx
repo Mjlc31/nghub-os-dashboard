@@ -14,7 +14,7 @@ interface LeadCardProps {
     onToggleSelect?: (id: string) => void;
 }
 
-export const LeadCard: React.FC<LeadCardProps> = ({
+const LeadCardComponent: React.FC<LeadCardProps> = ({
     lead,
     colorStyle,
     eventName,
@@ -25,20 +25,29 @@ export const LeadCard: React.FC<LeadCardProps> = ({
     isSelected,
     onToggleSelect
 }) => {
+    const handleClick = () => {
+        if (isBulkMode && onToggleSelect) {
+            onToggleSelect(lead.id);
+        } else {
+            onClick(lead);
+        }
+    };
+
+    const formattedDate = lead.createdAt
+        ? new Date(lead.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+        : '';
+
     return (
         <div
             draggable={!isBulkMode}
             onDragStart={(e) => !isBulkMode && onDragStart(e, lead.id)}
-            onClick={() => isBulkMode && onToggleSelect ? onToggleSelect(lead.id) : onClick(lead)}
+            onClick={handleClick}
             className={`p-4 rounded-xl transition-all group relative border ${isSelected ? 'bg-brand-gold/10 border-brand-gold/50' : 'bg-zinc-900/80'} ${!isBulkMode && 'cursor-grab hover:shadow-lg'} ${colorStyle && !isSelected ? colorStyle.border : ''} ${!isSelected && !colorStyle ? 'border-zinc-800/60 hover:border-brand-gold/30' : ''}`}
         >
             {/* Colored Left Bar for Tags */}
             {colorStyle && (
                 <div
-                    className={`absolute top-0 left-0 bottom-0 w-1 rounded-l-xl ${colorStyle.bg.replace(
-                        '/10',
-                        ''
-                    )}`}
+                    className={`absolute top-0 left-0 bottom-0 w-1 rounded-l-xl ${colorStyle.bg.replace('/10', '')}`}
                 ></div>
             )}
 
@@ -48,9 +57,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({
                     {lead.sector || 'Geral'}
                 </span>
                 {colorStyle && (
-                    <span
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${colorStyle.bg} ${colorStyle.text} ${colorStyle.border}`}
-                    >
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${colorStyle.bg} ${colorStyle.text} ${colorStyle.border}`}>
                         {eventName}
                     </span>
                 )}
@@ -67,12 +74,12 @@ export const LeadCard: React.FC<LeadCardProps> = ({
                     )}
                 </h4>
                 <p className="text-zinc-500 text-xs mt-0.5 shrink-0 truncate flex items-center gap-1.5">
-                    {lead.company}
+                    {lead.company || 'Sem empresa'}
                     {lead.owner && (
                         <>
                             <span className="text-zinc-700">•</span>
                             <span className="text-zinc-400 font-medium ml-0.5 truncate flex-shrink">
-                                Resp: {lead.owner.name.split(' ')[0]}
+                                {lead.owner.name.split(' ')[0]}
                             </span>
                         </>
                     )}
@@ -87,7 +94,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({
                     </span>
                 ) : (
                     <span className="text-[10px] text-zinc-600 font-mono">
-                        {new Date(lead.createdAt || '').toLocaleDateString('pt-BR')}
+                        {formattedDate}
                     </span>
                 )}
 
@@ -110,3 +117,17 @@ export const LeadCard: React.FC<LeadCardProps> = ({
         </div>
     );
 };
+
+// Custom memo comparison: only re-render if the lead's own data or selection state changed
+export const LeadCard = React.memo(LeadCardComponent, (prev, next) =>
+    prev.lead.id === next.lead.id &&
+    prev.lead.stage === next.lead.stage &&
+    prev.lead.value === next.lead.value &&
+    prev.lead.tagId === next.lead.tagId &&
+    prev.lead.ownerId === next.lead.ownerId &&
+    prev.lead.name === next.lead.name &&
+    prev.isSelected === next.isSelected &&
+    prev.isBulkMode === next.isBulkMode &&
+    prev.colorStyle?.text === next.colorStyle?.text &&
+    prev.eventName === next.eventName
+);

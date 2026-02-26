@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Lead, LeadStage, Event } from '../types';
 import {
@@ -164,14 +164,14 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     }
   };
 
-  const getTagStyle = (tagId?: string) => {
+  const getTagStyle = useCallback((tagId?: string) => {
     if (!tagId) return null;
     const index = events.findIndex(e => e.id === tagId);
     if (index === -1) return null;
     return TAG_STYLES[index % TAG_STYLES.length];
-  };
+  }, [events]);
 
-  const getEventName = (id?: string) => events.find(e => e.id === id)?.title;
+  const getEventName = useCallback((id?: string) => events.find(e => e.id === id)?.title, [events]);
 
   const filteredLeads = leads.filter(l => {
     const term = searchTerm.toLowerCase();
@@ -185,9 +185,9 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   });
 
   // Desktop Drag & Drop Logic
-  const handleDragStart = (e: React.DragEvent, id: string) => {
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('leadId', id);
-  };
+  }, []);
 
   const handleDrop = async (e: React.DragEvent, targetStage: LeadStage) => {
     e.preventDefault();
@@ -480,21 +480,21 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   };
 
   // Helper for quick actions
-  const openWhatsApp = (phone?: string) => {
+  const openWhatsApp = useCallback((phone?: string) => {
     if (!phone) return onNotify('info', 'Sem telefone cadastrado');
     const cleanPhone = phone.replace(/\D/g, '');
     window.open(`https://wa.me/55${cleanPhone}`, '_blank');
-  };
+  }, [onNotify]);
 
-  const openPhone = (phone?: string) => {
+  const openPhone = useCallback((phone?: string) => {
     if (!phone) return onNotify('info', 'Sem telefone cadastrado');
     window.location.href = `tel:${phone}`;
-  };
+  }, [onNotify]);
 
-  const openEmail = (email?: string) => {
+  const openEmail = useCallback((email?: string) => {
     if (!email) return onNotify('info', 'Sem email cadastrado');
     window.location.href = `mailto:${email}`;
-  };
+  }, [onNotify]);
 
   return (
     <div className="h-auto md:h-[calc(100vh-8rem)] flex flex-col relative">

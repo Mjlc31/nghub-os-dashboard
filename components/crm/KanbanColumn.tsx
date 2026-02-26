@@ -21,7 +21,7 @@ interface KanbanColumnProps {
     onToggleSelect?: (id: string) => void;
 }
 
-export const KanbanColumn: React.FC<KanbanColumnProps> = ({
+const KanbanColumnComponent: React.FC<KanbanColumnProps> = ({
     stage,
     title,
     leads,
@@ -66,15 +66,12 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
                     <div className="space-y-3">
                         {[1, 2, 3].map((i) => (
                             <div key={i} className="p-4 rounded-xl border border-zinc-800/40 bg-zinc-900/60 relative overflow-hidden">
-                                {/* Header Skeletons */}
                                 <div className="flex gap-2 mb-3">
                                     <Skeleton className="h-4 w-16 !bg-zinc-800 rounded-md" />
                                     <Skeleton className="h-4 w-12 !bg-zinc-800 rounded-md" />
                                 </div>
-                                {/* Main Skeletons */}
                                 <Skeleton className="h-4 w-3/4 mb-2 !rounded-md" />
                                 <Skeleton className="h-3 w-1/2 mb-4 !rounded-md" />
-                                {/* Footer Skeleton */}
                                 <div className="pt-3 border-t border-zinc-800/30">
                                     <Skeleton className="h-3 w-1/3 !rounded-md" />
                                 </div>
@@ -106,3 +103,31 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
         </div>
     );
 };
+
+// Memo: only re-render if this column's specific leads, total value, or selection changed.
+export const KanbanColumn = React.memo(KanbanColumnComponent, (prev, next) => {
+    if (prev.stage !== next.stage) return false;
+    if (prev.title !== next.title) return false;
+    if (prev.totalValue !== next.totalValue) return false;
+    if (prev.loading !== next.loading) return false;
+    if (prev.isBulkMode !== next.isBulkMode) return false;
+    if (prev.leads.length !== next.leads.length) return false;
+
+    // Deep check: only re-render if any lead in this column changed
+    for (let i = 0; i < prev.leads.length; i++) {
+        const pl = prev.leads[i];
+        const nl = next.leads[i];
+        if (pl.id !== nl.id || pl.stage !== nl.stage || pl.value !== nl.value ||
+            pl.tagId !== nl.tagId || pl.ownerId !== nl.ownerId || pl.name !== nl.name) {
+            return false;
+        }
+    }
+
+    // Check selected IDs relevant to this column
+    const prevSelected = (prev.selectedLeadIds || []).filter(id => prev.leads.some(l => l.id === id));
+    const nextSelected = (next.selectedLeadIds || []).filter(id => next.leads.some(l => l.id === id));
+    if (prevSelected.length !== nextSelected.length) return false;
+    if (prevSelected.some((id, i) => id !== nextSelected[i])) return false;
+
+    return true;
+});

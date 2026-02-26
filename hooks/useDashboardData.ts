@@ -27,10 +27,12 @@ export const useDashboardData = () => {
             const [
                 { data: trans },
                 { data: leads },
-                { data: events }
+                { data: events },
+                { data: upcomingEvents }
             ] = await Promise.all([
                 supabase.from('transactions').select('*').order('date', { ascending: true }),
-                supabase.from('leads').select('*'),
+                supabase.from('leads').select('*, tag:events(price)'),
+                supabase.from('events').select('id, price'),
                 supabase.from('events').select('*').eq('status', 'upcoming').order('date', { ascending: true }).limit(1)
             ]);
 
@@ -76,13 +78,13 @@ export const useDashboardData = () => {
             let nextEventDays = 'N/A';
             let nextEventName = 'Sem eventos';
 
-            if (events && events.length > 0) {
-                const nextDate = new Date(events[0].date);
+            if (upcomingEvents && upcomingEvents.length > 0) {
+                const nextDate = new Date(upcomingEvents[0].date);
                 const today = new Date();
                 const diffTime = Math.abs(nextDate.getTime() - today.getTime());
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 nextEventDays = `${diffDays} dias`;
-                nextEventName = events[0].title;
+                nextEventName = upcomingEvents[0].title;
             }
 
             // 4. Atividade Recente
