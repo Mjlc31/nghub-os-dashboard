@@ -166,7 +166,26 @@ const Finance: React.FC = () => {
               </div>
             </div>
             <div className="bg-brand-surface border border-brand-border rounded-xl flex flex-col">
-              <div className="p-6 border-b border-brand-border flex justify-between items-center"><h3 className="font-serif font-semibold text-white">Transações Recentes</h3><div className="flex gap-2"><button onClick={() => setFilter('all')} className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded ${filter === 'all' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}>Todos</button><button onClick={() => setFilter('income')} className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded ${filter === 'income' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}>Entradas</button><button onClick={() => setFilter('expense')} className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded ${filter === 'expense' ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'}`}>Saídas</button></div></div>
+              <div className="p-6 border-b border-brand-border flex justify-between items-center">
+                <h3 className="font-serif font-semibold text-white">Transações Recentes</h3>
+                <div className="flex gap-1 bg-zinc-900 rounded-lg p-1 border border-brand-border">
+                  {(['all', 'income', 'expense'] as const).map((f) => {
+                    const labels = { all: 'Todos', income: 'Entradas', expense: 'Saídas' };
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => setFilter(f)}
+                        className={`text-[10px] uppercase font-bold tracking-wider px-3 py-1.5 rounded-md transition-all duration-200 ${filter === f
+                            ? 'bg-brand-border text-white shadow-sm'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                          }`}
+                      >
+                        {labels[f]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="flex-1 overflow-y-auto max-h-[300px] custom-scrollbar p-4">
                 {isListLoading ? <div className="flex justify-center py-10"><Loader2 className="animate-spin text-brand-gold" /></div> : filteredTransactions.length === 0 ? <div className="text-center py-10 text-zinc-500 text-sm">Nenhuma transação encontrada.</div> : filteredTransactions.map((t) => (
                   <div key={t.id} className="flex items-center justify-between p-3 hover:bg-zinc-800/50 rounded-lg transition-colors group cursor-pointer border border-transparent hover:border-zinc-800">

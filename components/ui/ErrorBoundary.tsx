@@ -30,7 +30,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 return this.props.fallback;
             }
             return (
-                <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 font-sans text-zinc-200">
+                <div className="min-h-screen bg-brand-darker flex items-center justify-center p-4 font-sans text-zinc-200">
                     <div className="max-w-md w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl p-8 shadow-2xl backdrop-blur-sm text-center animate-fade-in relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500/0 via-red-500/50 to-red-500/0"></div>
 

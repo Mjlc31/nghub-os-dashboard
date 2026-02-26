@@ -45,12 +45,12 @@ export const NotificationDropdown: React.FC = () => {
             >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[#050505] animate-pulse"></span>
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-brand-darker animate-pulse"></span>
                 )}
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-80 md:w-96 bg-[#09090b] border border-zinc-800 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] z-50 overflow-hidden animate-fade-in origin-top-right">
+                <div className="absolute right-0 mt-2 w-80 md:w-96 bg-brand-dark border border-zinc-800 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] z-50 overflow-hidden animate-fade-in origin-top-right">
                     <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50 backdrop-blur-sm">
                         <h3 className="font-serif font-bold text-white text-sm">Notificações</h3>
                         {unreadCount > 0 && (

@@ -56,7 +56,7 @@ const Layout: React.FC = () => {
 
       {/* Sidebar */}
       <aside className={`
-        fixed lg:static inset-y-0 left-0 z-50 w-72 bg-[#08080a] border-r border-white/5 flex flex-col transition-transform duration-300 ease-out
+        fixed lg:static inset-y-0 left-0 z-50 w-72 bg-brand-darker border-r border-white/5 flex flex-col transition-transform duration-300 ease-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo Area */}
@@ -110,7 +110,7 @@ const Layout: React.FC = () => {
       <main className="flex-1 flex flex-col min-h-screen relative overflow-hidden bg-brand-dark">
 
         {/* Header (Mobile & Desktop) */}
-        <header className="h-20 border-b border-white/5 bg-[#050505]/80 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-6 lg:px-12">
+        <header className="h-20 border-b border-white/5 bg-brand-darker/80 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-6 lg:px-12">
           <button
             onClick={() => setIsMobileMenuOpen(true)}
             className="lg:hidden p-2 text-zinc-400 hover:text-white"

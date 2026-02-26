@@ -32,6 +32,8 @@ import {
    Cell
 } from 'recharts';
 import Modal from '../components/ui/Modal';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import { Event, Lead, LeadStage } from '../types';
 
@@ -523,16 +525,16 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
             title={editingEventId ? "Editar Evento" : "Criar Novo Evento"}
             footer={
                <>
-                  <button onClick={() => {
+                  <Button variant="ghost" onClick={() => {
                      setIsCreateModalOpen(false);
                      setEditingEventId(null);
                      setNewEvent({ title: '', date: '', location: '', capacity: '', price: '', imageUrl: '' });
-                  }} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                  }}>
                      Cancelar
-                  </button>
-                  <button onClick={handleSaveEvent} className="px-4 py-2 rounded-lg text-sm bg-brand-gold text-black font-semibold hover:bg-[#c5a059] transition-colors">
+                  </Button>
+                  <Button variant="primary" onClick={handleSaveEvent}>
                      {editingEventId ? "Salvar Alterações" : "Publicar Evento"}
-                  </button>
+                  </Button>
                </>
             }
          >
@@ -568,13 +570,36 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
                   </div>
                </div>
 
-               <div><label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Nome do Evento</label><input type="text" className="w-full bg-zinc-950 border border-brand-border rounded-lg px-3 py-2.5 text-white focus:border-brand-gold focus:outline-none text-sm" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} /></div>
+               <Input
+                  label="Nome do Evento"
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+               />
                <div className="grid grid-cols-2 gap-4">
-                  <div><label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Data</label><input type="datetime-local" className="w-full bg-zinc-950 border border-brand-border rounded-lg px-3 py-2.5 text-white focus:border-brand-gold focus:outline-none text-sm" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} /></div>
-                  <div><label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Capacidade</label><input type="number" className="w-full bg-zinc-950 border border-brand-border rounded-lg px-3 py-2.5 text-white focus:border-brand-gold focus:outline-none text-sm" value={newEvent.capacity} onChange={(e) => setNewEvent({ ...newEvent, capacity: e.target.value })} /></div>
+                  <Input
+                     label="Data"
+                     type="datetime-local"
+                     value={newEvent.date}
+                     onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                  />
+                  <Input
+                     label="Capacidade"
+                     type="number"
+                     value={newEvent.capacity}
+                     onChange={(e) => setNewEvent({ ...newEvent, capacity: e.target.value })}
+                  />
                </div>
-               <div><label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Local</label><input type="text" className="w-full bg-zinc-950 border border-brand-border rounded-lg px-3 py-2.5 text-white focus:border-brand-gold focus:outline-none text-sm" value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })} /></div>
-               <div><label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1.5">Preço do Ingresso (R$)</label><input type="number" className="w-full bg-zinc-950 border border-brand-border rounded-lg px-3 py-2.5 text-white focus:border-brand-gold focus:outline-none text-sm" value={newEvent.price} onChange={(e) => setNewEvent({ ...newEvent, price: e.target.value })} /></div>
+               <Input
+                  label="Local"
+                  value={newEvent.location}
+                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+               />
+               <Input
+                  label="Preço do Ingresso (R$)"
+                  type="number"
+                  value={newEvent.price}
+                  onChange={(e) => setNewEvent({ ...newEvent, price: e.target.value })}
+               />
             </div>
          </Modal>
       </div>

@@ -563,7 +563,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       </div>
 
       {/* MOBILE: Sticky Stage Selector (Pill Tabs) */}
-      <div className="md:hidden sticky top-20 z-40 bg-[#050505]/95 backdrop-blur-md py-2 border-b border-zinc-800/50 -mx-4 px-4 mb-4">
+      <div className="md:hidden sticky top-20 z-40 bg-brand-darker/95 backdrop-blur-md py-2 border-b border-zinc-800/50 -mx-4 px-4 mb-4">
         <div className="flex overflow-x-auto gap-2 no-scrollbar scroll-smooth snap-x">
           {stageKeys.map((stage) => {
             const isActive = activeMobileStage === stage;
@@ -710,7 +710,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileActionLead(null)}></div>
 
           {/* Sheet Content */}
-          <div className="relative bg-[#09090b] border-t border-zinc-800 rounded-t-2xl p-6 pb-10 shadow-2xl animate-slide-up-fast max-h-[85vh] overflow-y-auto">
+          <div className="relative bg-brand-dark border-t border-zinc-800 rounded-t-2xl p-6 pb-10 shadow-2xl animate-slide-up-fast max-h-[85vh] overflow-y-auto">
             <div className="w-12 h-1 bg-zinc-800 rounded-full mx-auto mb-6"></div>
 
             <div className="flex items-center gap-4 mb-6 pb-6 border-b border-zinc-800">

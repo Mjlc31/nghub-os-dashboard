@@ -22,9 +22,9 @@ const Toast: React.FC<ToastProps> = ({ toasts, removeToast }) => {
           key={toast.id}
           className={`
             min-w-[320px] p-4 rounded-lg shadow-2xl border flex items-center gap-4 animate-slide-in-right backdrop-blur-xl
-            ${toast.type === 'success' ? 'bg-[#09090b]/90 border-brand-gold/50 text-white shadow-brand-gold/10' : ''}
-            ${toast.type === 'error' ? 'bg-[#09090b]/90 border-red-500/50 text-white shadow-red-500/10' : ''}
-            ${toast.type === 'info' ? 'bg-[#09090b]/90 border-zinc-700 text-white' : ''}
+            ${toast.type === 'success' ? 'bg-brand-dark/90 border-brand-gold/50 text-white shadow-brand-gold/10' : ''}
+            ${toast.type === 'error' ? 'bg-brand-dark/90 border-red-500/50 text-white shadow-red-500/10' : ''}
+            ${toast.type === 'info' ? 'bg-brand-dark/90 border-zinc-700 text-white' : ''}
           `}
         >
           {toast.type === 'success' && <div className="p-1 bg-brand-gold/10 rounded-full"><CheckCircle className="w-5 h-5 text-brand-gold" /></div>}

@@ -15,8 +15,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-[#09090b] border border-[#27272a] rounded-xl w-full max-w-lg shadow-2xl animate-scale-in">
-        <div className="flex items-center justify-between p-6 border-b border-[#27272a]">
+      <div className="relative bg-brand-dark border border-brand-border rounded-xl w-full max-w-lg shadow-2xl animate-scale-in">
+        <div className="flex items-center justify-between p-6 border-b border-brand-border">
           <h2 className="text-xl font-bold text-white">{title}</h2>
           <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
@@ -26,7 +26,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer 
           {children}
         </div>
         {footer && (
-          <div className="p-6 border-t border-[#27272a] bg-[#18181b]/50 rounded-b-xl flex justify-end gap-3">
+          <div className="p-6 border-t border-brand-border bg-brand-surface/50 rounded-b-xl flex justify-end gap-3">
             {footer}
           </div>
         )}
