@@ -830,7 +830,12 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       />
 
       {/* Edit Stages Modal */}
-      <Modal isOpen={isEditStagesModalOpen} onClose={() => setIsEditStagesModalOpen(false)} title="Configurar Etapas do CRM" footer={<><button onClick={() => setIsEditStagesModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white">Cancelar</button><button onClick={saveStageNames} className="px-4 py-2 rounded-lg text-sm bg-brand-gold text-black font-bold hover:bg-[#c5a059]">Salvar Alterações</button></>}>
+      <Modal isOpen={isEditStagesModalOpen} onClose={() => setIsEditStagesModalOpen(false)} title="Configurar Etapas do CRM" footer={
+        <>
+          <Button variant="ghost" onClick={() => setIsEditStagesModalOpen(false)}>Cancelar</Button>
+          <Button variant="primary" onClick={saveStageNames}>Salvar Alterações</Button>
+        </>
+      }>
         <div className="space-y-4">
           <p className="text-xs text-zinc-500 mb-4">Personalize os nomes das colunas do seu funil de vendas.</p>
           {stageKeys.map((key) => (

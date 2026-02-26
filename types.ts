@@ -88,3 +88,23 @@ export interface Campaign {
   sentCount: number;
   date: string;
 }
+
+// Shared utility types
+export interface TagStyle {
+  name: string;
+  bg: string;
+  border: string;
+  text: string;
+  hover: string;
+}
+
+export interface DashboardKPIs {
+  revenue: number;
+  expenses: number;
+  netIncome: number;
+  activeLeads: number;
+  totalLeads: number;
+  conversionRate: number;
+  nextEventDays: string;
+  nextEventName: string;
+}

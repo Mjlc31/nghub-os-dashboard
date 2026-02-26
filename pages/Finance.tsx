@@ -7,6 +7,7 @@ import { Transaction } from '../types';
 import { supabase } from '../lib/supabase';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
+import { Button } from '../components/ui/Button';
 
 const Finance: React.FC = () => {
   const [viewMode, setViewMode] = useState<'cashflow' | 'dre'>('cashflow');
@@ -125,7 +126,11 @@ const Finance: React.FC = () => {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div><h1 className="text-4xl font-serif font-bold text-white tracking-tight mb-2">Financeiro</h1><p className="text-zinc-400">Fluxo de caixa, DRE e gestão de inadimplência.</p></div>
-        <div className="flex gap-2"><button onClick={() => setIsModalOpen(true)} className="bg-brand-gold text-black font-semibold px-5 py-2.5 rounded-lg text-sm hover:bg-[#c5a059] transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(212,175,55,0.2)] hover:shadow-[0_0_20px_rgba(212,175,55,0.4)]"><Plus className="w-4 h-4" /> Nova Transação</button></div>
+        <div className="flex gap-2">
+          <Button variant="primary" onClick={() => setIsModalOpen(true)} icon={Plus}>
+            Nova Transação
+          </Button>
+        </div>
       </div>
       <div className="flex gap-4 border-b border-brand-border">
         <button onClick={() => setViewMode('cashflow')} className={`pb-3 text-sm font-medium flex items-center gap-2 transition-colors ${viewMode === 'cashflow' ? 'text-brand-gold border-b-2 border-brand-gold' : 'text-zinc-500 hover:text-white'}`}><LayoutDashboard className="w-4 h-4" /> Fluxo de Caixa</button>
@@ -176,8 +181,8 @@ const Finance: React.FC = () => {
                         key={f}
                         onClick={() => setFilter(f)}
                         className={`text-[10px] uppercase font-bold tracking-wider px-3 py-1.5 rounded-md transition-all duration-200 ${filter === f
-                            ? 'bg-brand-border text-white shadow-sm'
-                            : 'text-zinc-500 hover:text-zinc-300'
+                          ? 'bg-brand-border text-white shadow-sm'
+                          : 'text-zinc-500 hover:text-zinc-300'
                           }`}
                       >
                         {labels[f]}
@@ -247,7 +252,12 @@ const Finance: React.FC = () => {
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nova Transação" footer={<><button onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Cancelar</button><button onClick={handleAddTransaction} className="px-4 py-2 rounded-lg text-sm bg-brand-gold text-black font-semibold hover:bg-[#c5a059] transition-colors">Salvar</button></>}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nova Transação" footer={
+        <>
+          <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+          <Button variant="primary" onClick={handleAddTransaction} icon={Plus}>Salvar</Button>
+        </>
+      }>
         <div className="space-y-4">
           <Input
             label="Descrição"

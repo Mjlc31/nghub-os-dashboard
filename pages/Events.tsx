@@ -1,22 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
    Calendar,
    MapPin,
    Plus,
-   CheckCircle2,
    Ticket,
    Trash2,
    Users,
    TrendingUp,
    Clock,
-   Search,
-   MoreVertical,
    ChevronRight,
    UserCheck,
    DollarSign,
    PieChart,
    ArrowLeft,
-   Image as ImageIcon,
    Loader2,
    UploadCloud,
    Edit2
@@ -36,6 +32,8 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import { Event, Lead, LeadStage } from '../types';
+
+
 
 interface EventsProps {
    onNotify: (type: 'success' | 'error', msg: string) => void;
@@ -403,13 +401,23 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
          {/* Controls & Filters */}
          <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-zinc-800 pb-4">
             <div className="flex bg-zinc-900 p-1 rounded-lg border border-zinc-800">
-               <button onClick={() => setFilter('upcoming')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${filter === 'upcoming' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>Próximos</button>
-               <button onClick={() => setFilter('past')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${filter === 'past' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>Realizados</button>
-               <button onClick={() => setFilter('all')} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${filter === 'all' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>Todos</button>
+               {(['upcoming', 'past', 'all'] as const).map((f) => {
+                  const labels = { upcoming: 'Próximos', past: 'Realizados', all: 'Todos' };
+                  return (
+                     <button
+                        key={f}
+                        onClick={() => setFilter(f)}
+                        className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${filter === f ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
+                           }`}
+                     >
+                        {labels[f]}
+                     </button>
+                  );
+               })}
             </div>
-            <button onClick={() => setIsCreateModalOpen(true)} className="w-full md:w-auto bg-zinc-900 border border-zinc-800 hover:border-brand-gold/50 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors">
-               <Plus className="w-4 h-4 text-brand-gold" /> Criar Evento
-            </button>
+            <Button variant="outline" onClick={() => setIsCreateModalOpen(true)} icon={Plus} className="w-full md:w-auto">
+               Criar Evento
+            </Button>
          </div>
 
          {/* Events Grid */}

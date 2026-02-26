@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, MessageCircle } from 'lucide-react';
+import { Mail, MessageCircle, Phone, ExternalLink } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
@@ -13,10 +13,11 @@ interface LeadDetailModalProps {
     team: Seller[];
     onUpdateTag: (leadId: string, tagId: string) => Promise<void>;
     onUpdateOwner: (leadId: string, ownerId: string) => Promise<void>;
+    onDelete?: (id: string) => void;
 }
 
 export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
-    isOpen, onClose, selectedLead, events, team, onUpdateTag, onUpdateOwner
+    isOpen, onClose, selectedLead, events, team, onUpdateTag, onUpdateOwner, onDelete
 }) => {
     if (!selectedLead) return null;
 
@@ -31,27 +32,58 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         window.location.href = `mailto:${email}`;
     };
 
-    const displayPrice = selectedLead.tagId ? (events.find(e => e.id === selectedLead.tagId)?.price || selectedLead.value) : selectedLead.value;
+    const displayPrice = selectedLead.tagId
+        ? (events.find(e => e.id === selectedLead.tagId)?.price || selectedLead.value)
+        : selectedLead.value;
+
+    const initials = selectedLead.name
+        .split(' ')
+        .slice(0, 2)
+        .map(n => n.charAt(0))
+        .join('')
+        .toUpperCase();
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Detalhes do Lead">
             <div className="space-y-6">
+                {/* HEADER */}
                 <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center text-xl font-bold text-brand-gold border border-zinc-700">
-                        {selectedLead.name.charAt(0)}
+                    <div className="w-16 h-16 bg-gradient-to-br from-zinc-800 to-zinc-900 rounded-full flex items-center justify-center text-xl font-bold text-brand-gold border border-zinc-700 shrink-0 shadow-inner">
+                        {initials}
                     </div>
-                    <div className="flex-[1]">
-                        <h3 className="text-xl font-serif font-bold text-white">{selectedLead.name}</h3>
-                        <p className="text-zinc-400 text-sm">{selectedLead.company} • {selectedLead.sector}</p>
-
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-xl font-serif font-bold text-white truncate">{selectedLead.name}</h3>
+                        <p className="text-zinc-400 text-sm truncate">
+                            {[selectedLead.company, selectedLead.sector].filter(Boolean).join(' • ')}
+                        </p>
                         {displayPrice > 0 && (
-                            <p className="text-emerald-400 font-mono text-sm mt-1">R$ {displayPrice.toLocaleString('pt-BR')}</p>
+                            <p className="text-emerald-400 font-mono text-sm mt-1 font-bold">
+                                R$ {displayPrice.toLocaleString('pt-BR')}
+                            </p>
                         )}
                     </div>
                 </div>
 
+                {/* CONTACT INFO */}
+                {(selectedLead.email || selectedLead.phone) && (
+                    <div className="flex flex-col gap-2 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
+                        {selectedLead.phone && (
+                            <p className="text-xs text-zinc-400 flex items-center gap-2">
+                                <Phone className="w-3.5 h-3.5 text-zinc-600" />
+                                {selectedLead.phone}
+                            </p>
+                        )}
+                        {selectedLead.email && (
+                            <p className="text-xs text-zinc-400 flex items-center gap-2">
+                                <Mail className="w-3.5 h-3.5 text-zinc-600" />
+                                {selectedLead.email}
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 {/* TAG & OWNER SELECTION */}
-                <div className="mt-4 pt-4 border-t border-zinc-800 grid gap-4">
+                <div className="pt-4 border-t border-zinc-800 grid gap-4">
                     <Select
                         label="Etiqueta (Evento)"
                         value={selectedLead.tagId || ''}
@@ -76,13 +108,13 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="w-full text-green-500 hover:text-green-400 hover:bg-green-500/10 border border-green-500/20"
+                                icon={MessageCircle}
+                                className="w-full justify-center text-green-500 hover:text-green-400 hover:bg-green-500/10 border border-green-500/20"
                                 onClick={() => {
                                     const message = encodeURIComponent(`Olá ${selectedLead.owner?.name}, você tem um novo lead na NGHUB OS: ${selectedLead.name}.`);
                                     window.open(`https://wa.me/55${selectedLead.owner?.phone?.replace(/\D/g, '')}?text=${message}`, '_blank');
                                 }}
                             >
-                                <MessageCircle className="w-4 h-4 mr-2" />
                                 Notificar Responsável
                             </Button>
                         )}
@@ -90,13 +122,23 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </div>
 
                 {/* ACTION BUTTONS */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800">
-                    <button onClick={() => openWhatsApp(selectedLead.phone)} className="flex items-center justify-center gap-2 bg-green-900/20 text-green-500 p-3 rounded-lg border border-green-900/30 font-bold text-sm hover:bg-green-900/30 transition-colors">
-                        <MessageCircle className="w-4 h-4" /> WhatsApp
-                    </button>
-                    <button onClick={() => openEmail(selectedLead.email)} className="flex items-center justify-center gap-2 bg-zinc-800 text-white p-3 rounded-lg border border-zinc-700 font-bold text-sm hover:bg-zinc-700 transition-colors">
-                        <Mail className="w-4 h-4" /> Email
-                    </button>
+                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-zinc-800">
+                    <Button
+                        variant="outline"
+                        icon={MessageCircle}
+                        onClick={() => openWhatsApp(selectedLead.phone)}
+                        className="justify-center text-green-500 border-green-500/20 hover:bg-green-500/10 hover:border-green-500/40"
+                    >
+                        WhatsApp
+                    </Button>
+                    <Button
+                        variant="outline"
+                        icon={Mail}
+                        onClick={() => openEmail(selectedLead.email)}
+                        className="justify-center"
+                    >
+                        Email
+                    </Button>
                 </div>
             </div>
         </Modal>

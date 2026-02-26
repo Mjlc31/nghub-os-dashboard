@@ -8,6 +8,7 @@ interface KPICardProps {
     icon: LucideIcon;
     trend?: number;
     colorClass: string;
+    onClick?: () => void;
 }
 
 export const KPICard: React.FC<KPICardProps> = ({
@@ -17,17 +18,21 @@ export const KPICard: React.FC<KPICardProps> = ({
     icon: Icon,
     trend,
     colorClass,
+    onClick,
 }) => (
-    <div className="bg-brand-surface border border-brand-border p-6 rounded-xl relative overflow-hidden group hover:border-brand-gold/20 transition-all duration-300">
+    <div
+        onClick={onClick}
+        className={`bg-brand-surface border border-brand-border p-6 rounded-xl relative overflow-hidden group hover:border-brand-gold/20 transition-all duration-300 ${onClick ? 'cursor-pointer' : ''}`}
+    >
         <div className="flex justify-between items-start mb-4 relative z-10">
             <div className={`p-2.5 rounded-lg border border-white/5 ${colorClass}`}>
                 <Icon className="w-5 h-5" />
             </div>
-            {trend && (
+            {typeof trend === 'number' && (
                 <div
                     className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full border ${trend > 0
-                            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
-                            : 'border-red-500/20 bg-red-500/10 text-red-400'
+                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+                        : 'border-red-500/20 bg-red-500/10 text-red-400'
                         }`}
                 >
                     {trend > 0 ? (
@@ -43,7 +48,7 @@ export const KPICard: React.FC<KPICardProps> = ({
             <h3 className="text-zinc-500 text-xs font-medium uppercase tracking-wider mb-1">
                 {title}
             </h3>
-            <div className="text-2xl md:text-3xl font-serif font-bold text-white mb-1">
+            <div className="text-2xl md:text-3xl font-serif font-bold text-white mb-1 truncate">
                 {value}
             </div>
             <p className="text-xs text-zinc-500 truncate">{subtitle}</p>
