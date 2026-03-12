@@ -74,25 +74,26 @@ export const useDashboardData = (timeFilter: TimeFilter = 'all') => {
                 : allLeads.filter(l => new Date(l.created_at) >= filterDate);
 
             // 1. Financeiro (Transactions & Receita)
-            // Nova regra: Somar apenas Leads com Venda Fechada e etiqueta contendo BASE ou MASTERS
-            let grossRevenue = 0;
+            // Lógica: Somar todos os leads em Venda Fechada + Entradas não-CRM (para evitar duplicidade)
+            let leadsRevenue = 0;
             leadsList.forEach(l => {
                 if (l.stage === LeadStage.WON || l.stage === 'Membro Ativo') {
-                    const eventTitle = (l.tag?.title || '').toUpperCase();
-                    // Se for um evento NG.BASE ou MASTERS, computamos o lucro
-                    if (eventTitle.includes('BASE') || eventTitle.includes('MASTERS')) {
-                        // Prioriza o valor manual do lead, se disponível e maior que zero
-                        const price = (Number(l.value) > 0) ? Number(l.value) : (l.tag?.price || 0);
-                        grossRevenue += price;
-                    }
+                    const price = (Number(l.value) > 0) ? Number(l.value) : (l.tag?.price || 0);
+                    if (price > 0) leadsRevenue += price;
                 }
             });
 
+            const otherIncome = filteredTransactions
+                .filter(t => t.type === 'income' && t.category !== 'CRM')
+                .reduce((acc, curr) => acc + Number(curr.amount), 0);
+
+            const grossRevenue = leadsRevenue + otherIncome;
             const taxes = grossRevenue * taxRate;
             const netRevenue = grossRevenue - taxes;
+            
             const variableExpenses = filteredTransactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0);
             const totalExpenses = variableExpenses + fixedCostsTotal;
-            const netIncome = netRevenue - variableExpenses - fixedCostsTotal;
+            const netIncome = netRevenue - totalExpenses;
 
             // Preparar dados para o gráfico de fluxo
             const chartMap: Record<string, number> = {};

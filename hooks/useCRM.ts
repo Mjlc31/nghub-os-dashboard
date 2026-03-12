@@ -122,9 +122,16 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
             const newEventPrice = selectedEvent ? selectedEvent.price : 0;
             const currentLead = leads.find(l => l.id === leadId);
 
-            const finalValueToSave = tagId === '' ? 0 : (newEventPrice > 0 ? newEventPrice : (currentLead?.value || 0));
+            // Só atualiza o value se o lead tiver 0 no momento ou se estivermos removendo a tag
+            // Se o lead já tem um valor manual (> 0), mantemos o valor dele.
+            const shouldUpdateValue = !currentLead?.value || currentLead.value === 0;
+            const finalValueToSave = shouldUpdateValue ? (tagId === '' ? 0 : newEventPrice) : currentLead.value;
 
-            const { error } = await supabase.from('leads').update({ tag_id: tagId || null, value: finalValueToSave }).eq('id', leadId);
+            const { error } = await supabase.from('leads').update({ 
+                tag_id: tagId || null, 
+                value: finalValueToSave 
+            }).eq('id', leadId);
+            
             if (error) throw error;
 
             setLeads(prev => prev.map(l => l.id === leadId ? { ...l, tagId: tagId || undefined, value: finalValueToSave } : l));
