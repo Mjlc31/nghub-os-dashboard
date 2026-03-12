@@ -1,8 +1,9 @@
-import React from 'react';
-import { Mail, MessageCircle, Phone, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Mail, MessageCircle, Phone, Trash2, FileText, DollarSign } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
+import { Input } from '../ui/Input';
 import { Lead, Event, Seller } from '../../types';
 
 interface LeadDetailModalProps {
@@ -13,18 +14,37 @@ interface LeadDetailModalProps {
     team: Seller[];
     onUpdateTag: (leadId: string, tagId: string) => Promise<void>;
     onUpdateOwner: (leadId: string, ownerId: string) => Promise<void>;
-    onDelete?: (id: string) => void;
+    onUpdateNotes: (leadId: string, notes: string) => Promise<void>;
+    onUpdateValue: (leadId: string, value: number) => Promise<void>;
+    onDeleteLead?: (id: string) => void;
 }
 
 export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
-    isOpen, onClose, selectedLead, events, team, onUpdateTag, onUpdateOwner, onDelete
+    isOpen, onClose, selectedLead, events, team,
+    onUpdateTag, onUpdateOwner, onUpdateNotes, onUpdateValue, onDeleteLead
 }) => {
+    const [notesValue, setNotesValue] = useState('');
+    const [isSavingNotes, setIsSavingNotes] = useState(false);
+    
+    const [priceValue, setPriceValue] = useState<string>('');
+    const [isSavingPrice, setIsSavingPrice] = useState(false);
+    
+    const notesDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const priceDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Sync fields when the selected lead changes
+    useEffect(() => {
+        if (selectedLead) {
+            setNotesValue(selectedLead.notes || '');
+            setPriceValue(selectedLead.value?.toString() || '0');
+        }
+    }, [selectedLead?.id]);
+
     if (!selectedLead) return null;
 
     const openWhatsApp = (phone?: string) => {
         if (!phone) return;
-        const cleanPhone = phone.replace(/\D/g, '');
-        window.open(`https://wa.me/55${cleanPhone}`, '_blank');
+        window.open(`https://wa.me/55${phone.replace(/\D/g, '')}`, '_blank');
     };
 
     const openEmail = (email?: string) => {
@@ -32,9 +52,31 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         window.location.href = `mailto:${email}`;
     };
 
-    const displayPrice = selectedLead.tagId
-        ? (events.find(e => e.id === selectedLead.tagId)?.price || selectedLead.value)
-        : selectedLead.value;
+    const handleNotesChange = (value: string) => {
+        setNotesValue(value);
+        if (notesDebounceTimer.current) clearTimeout(notesDebounceTimer.current);
+        notesDebounceTimer.current = setTimeout(async () => {
+            setIsSavingNotes(true);
+            await onUpdateNotes(selectedLead.id, value);
+            setIsSavingNotes(false);
+        }, 800);
+    };
+
+    const handlePriceChange = (value: string) => {
+        // Allow only numbers and dots/commas
+        const cleanValue = value.replace(/[^\d.,]/g, '').replace(',', '.');
+        setPriceValue(cleanValue);
+        
+        const numericValue = parseFloat(cleanValue);
+        if (isNaN(numericValue)) return;
+
+        if (priceDebounceTimer.current) clearTimeout(priceDebounceTimer.current);
+        priceDebounceTimer.current = setTimeout(async () => {
+            setIsSavingPrice(true);
+            await onUpdateValue(selectedLead.id, numericValue);
+            setIsSavingPrice(false);
+        }, 800);
+    };
 
     const initials = selectedLead.name
         .split(' ')
@@ -56,11 +98,14 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         <p className="text-zinc-400 text-sm truncate">
                             {[selectedLead.company, selectedLead.sector].filter(Boolean).join(' • ')}
                         </p>
-                        {displayPrice > 0 && (
-                            <p className="text-emerald-400 font-mono text-sm mt-1 font-bold">
-                                R$ {displayPrice.toLocaleString('pt-BR')}
-                            </p>
-                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-emerald-400 font-mono text-sm font-bold">
+                                R$ {Number(priceValue || 0).toLocaleString('pt-BR')}
+                            </span>
+                            {isSavingPrice && (
+                                <span className="text-[10px] text-zinc-500 italic animate-pulse">Salvando...</span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -84,15 +129,30 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
                 {/* TAG & OWNER SELECTION */}
                 <div className="pt-4 border-t border-zinc-800 grid gap-4">
-                    <Select
-                        label="Etiqueta (Evento)"
-                        value={selectedLead.tagId || ''}
-                        onChange={(e) => onUpdateTag(selectedLead.id, e.target.value)}
-                        options={[
-                            { value: '', label: 'Sem etiqueta' },
-                            ...events.map(ev => ({ value: ev.id, label: ev.title }))
-                        ]}
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                        <Select
+                            label="Etiqueta (Evento)"
+                            value={selectedLead.tagId || ''}
+                            onChange={(e) => onUpdateTag(selectedLead.id, e.target.value)}
+                            options={[
+                                { value: '', label: 'Sem etiqueta' },
+                                ...events.map(ev => ({ value: ev.id, label: ev.title }))
+                            ]}
+                        />
+                        <div className="space-y-1">
+                            <label className="text-[11px] font-bold uppercase tracking-widest text-zinc-500">Valor do Ingresso (R$)</label>
+                            <div className="relative">
+                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                                <input
+                                    type="text"
+                                    value={priceValue}
+                                    onChange={(e) => handlePriceChange(e.target.value)}
+                                    className="w-full bg-zinc-900/50 border border-zinc-800 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:outline-none focus:border-brand-gold/50 transition-colors"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     <div className="space-y-2">
                         <Select
@@ -121,6 +181,28 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                     </div>
                 </div>
 
+                {/* NOTES SECTION */}
+                <div className="pt-4 border-t border-zinc-800">
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="text-[11px] font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5">
+                            <FileText className="w-3.5 h-3.5" />
+                            Anotações
+                        </label>
+                        {isSavingNotes && (
+                            <span className="text-[10px] text-zinc-500 italic animate-pulse">Salvando...</span>
+                        )}
+                        {!isSavingNotes && notesValue && (
+                            <span className="text-[10px] text-emerald-500">✓ Salvo</span>
+                        )}
+                    </div>
+                    <textarea
+                        className="w-full bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/20 resize-y min-h-[100px] transition-colors custom-scrollbar"
+                        placeholder="Adicione observações sobre este lead: contexto da conversa, próximos passos, objeções..."
+                        value={notesValue}
+                        onChange={(e) => handleNotesChange(e.target.value)}
+                    />
+                </div>
+
                 {/* ACTION BUTTONS */}
                 <div className="grid grid-cols-2 gap-3 pt-4 border-t border-zinc-800">
                     <Button
@@ -140,6 +222,18 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         Email
                     </Button>
                 </div>
+
+                {/* DELETE */}
+                {onDeleteLead && (
+                    <Button
+                        variant="ghost"
+                        icon={Trash2}
+                        onClick={() => onDeleteLead(selectedLead.id)}
+                        className="w-full justify-center text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-red-500/20"
+                    >
+                        Excluir Lead
+                    </Button>
+                )}
             </div>
         </Modal>
     );

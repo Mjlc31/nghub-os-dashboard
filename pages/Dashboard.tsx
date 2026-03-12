@@ -12,7 +12,7 @@ import { KPICard } from '../components/dashboard/KPICard';
 import { RevenueChart } from '../components/dashboard/RevenueChart';
 import { SalesFunnel } from '../components/dashboard/SalesFunnel';
 import { RecentActivity } from '../components/dashboard/RecentActivity';
-import { useDashboardData } from '../hooks/useDashboardData';
+import { useDashboardData, TimeFilter } from '../hooks/useDashboardData';
 import { Skeleton } from '../components/ui/Skeleton';
 
 interface DashboardProps {
@@ -20,7 +20,8 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC = () => {
-  const { loading, kpis, chartData, funnelData, recentActivity } = useDashboardData();
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+  const { loading, kpis, chartData, funnelData, recentActivity } = useDashboardData(timeFilter);
   const navigate = useNavigate();
 
   const handleNavigate = (path: string, openModal = false) => {
@@ -106,10 +107,12 @@ const Dashboard: React.FC = () => {
           <h1 className="text-3xl md:text-4xl font-serif font-bold text-white tracking-tight mb-1">Visão Geral</h1>
           <p className="text-sm text-zinc-400">Métricas de performance em tempo real.</p>
         </div>
-        <div className="flex items-center gap-2 bg-brand-surface border border-brand-border rounded-lg p-1 text-xs font-medium text-zinc-400">
-          <span className="px-3 py-1 bg-brand-border text-white rounded shadow-sm">Hoje</span>
-          <span className="px-3 py-1 hover:text-white cursor-pointer transition-colors">7D</span>
-          <span className="px-3 py-1 hover:text-white cursor-pointer transition-colors">30D</span>
+        <div className="flex items-center gap-1 bg-brand-surface border border-brand-border rounded-lg p-1 text-xs font-medium text-zinc-400 overflow-x-auto no-scrollbar">
+          <button onClick={() => setTimeFilter('today')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === 'today' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>Hoje</button>
+          <button onClick={() => setTimeFilter('7d')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === '7d' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>7 Dias</button>
+          <button onClick={() => setTimeFilter('15d')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === '15d' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>15 Dias</button>
+          <button onClick={() => setTimeFilter('30d')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === '30d' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>30 Dias</button>
+          <button onClick={() => setTimeFilter('all')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === 'all' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>Todos</button>
         </div>
       </div>
 

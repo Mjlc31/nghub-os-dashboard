@@ -18,9 +18,28 @@ export default defineConfig(({ mode }) => {
     envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     resolve: {
       alias: {
-        // Garante que @ aponta para ./src se existir, ou . (root)
         '@': path.resolve(__dirname, './'),
       }
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // Core React + Router
+            vendor: ['react', 'react-dom', 'react-router-dom'],
+            // Charts library (heavy)
+            charts: ['recharts'],
+            // Supabase client
+            supabase: ['@supabase/supabase-js'],
+            // Icons
+            icons: ['lucide-react'],
+            // Spreadsheet utils
+            xlsx: ['xlsx'],
+          }
+        }
+      },
+      // Raise the warning threshold slightly as this is expected for SaaS
+      chunkSizeWarningLimit: 600,
     }
   };
 });

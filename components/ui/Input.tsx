@@ -5,12 +5,13 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label?: string;
     error?: string;
     hint?: string;
-    icon?: LucideIcon;
+    icon?: React.ReactNode | LucideIcon;
     containerClassName?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-    ({ label, error, hint, icon: Icon, className = '', containerClassName = '', ...props }, ref) => {
+    ({ label, error, hint, icon, className = '', containerClassName = '', ...props }, ref) => {
+        const Icon = icon as any;
         return (
             <div className={`group ${containerClassName}`}>
                 {label && (
@@ -19,9 +20,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                     </label>
                 )}
                 <div className="relative">
-                    {Icon && (
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-brand-gold transition-colors pointer-events-none">
-                            <Icon className="w-4 h-4" />
+                    {icon && (
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-brand-gold transition-colors pointer-events-none flex items-center justify-center">
+                            {typeof icon === 'function' ? (
+                                <Icon className="w-4 h-4" />
+                            ) : (
+                                React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement, {
+                                    className: `w-4 h-4 ${(icon.props as any).className || ''}`
+                                }) : icon
+                            )}
                         </div>
                     )}
                     <input

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Lead, LeadStage, Event } from '../types';
 import {
   MoreHorizontal, Plus, Search, Filter, Phone, Calendar, ArrowRight,
   Save, MessageCircle, Loader2, UserPlus, Upload, FileSpreadsheet,
   Download, Trash2, Settings, CheckCircle, Mail, ChevronRight, Briefcase, ChevronDown, Tag, Edit2,
-  X, MoveRight, MoveLeft, DollarSign, Circle
+  X, MoveRight, MoveLeft, DollarSign, Circle, MessageSquare
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { supabase } from '../lib/supabase';
@@ -13,6 +13,10 @@ import * as XLSX from 'xlsx';
 import { KanbanColumn } from '../components/crm/KanbanColumn';
 import { LeadFormModal } from '../components/crm/LeadFormModal';
 import { ImportLeadsModal } from '../components/crm/ImportLeadsModal';
+import { SellersModal } from '../components/crm/SellersModal';
+import { LeadDetailModal } from '../components/crm/LeadDetailModal';
+import { EditStagesModal } from '../components/crm/EditStagesModal';
+import { useCRM } from '../hooks/useCRM';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -33,135 +37,72 @@ const TAG_STYLES = [
 ];
 
 const CRM: React.FC<CRMProps> = ({ onNotify }) => {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [team, setTeam] = useState<{ id: string, name: string, phone?: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Filtro por etiqueta (ID do evento)
-  const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
-
-  // Mobile State
-  const [activeMobileStage, setActiveMobileStage] = useState<LeadStage>(LeadStage.DRAFT);
-  const [mobileActionLead, setMobileActionLead] = useState<Lead | null>(null); // Lead selecionado para o menu bottom sheet
-
+  const navigate = useNavigate();
   const location = useLocation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (location.state?.openModal) {
-      setIsAddModalOpen(true);
-      // Clear state to prevent reopening on refresh? (Optional, but good practice in some routers, though standard history usually keeps it)
-      window.history.replaceState({}, document.title);
-    }
-  }, [location]);
+  const {
+    leads, setLeads,
+    events,
+    team,
+    loading,
+    stageNames,
+    saveStageNames,
+    updateLeadStage,
+    updateLeadTag,
+    updateLeadOwner,
+    updateLeadNotes,
+    updateLeadValue,
+    addLead,
+    bulkAssignLeads,
+    addSeller,
+    deleteSeller,
+    refreshLeads
+  } = useCRM(onNotify);
 
-  // Initial stage names config
-  const defaultStageNames = {
-    [LeadStage.DRAFT]: 'Rascunhos',
-    [LeadStage.NEW_LEAD]: 'Novo Lead',
-    [LeadStage.QUALIFIED]: 'Qualificado',
-    [LeadStage.NEGOTIATION]: 'Em Negociação',
-    [LeadStage.WON]: 'Venda Fechada',
-    [LeadStage.CHURN]: 'Churn'
-  };
-
-  const [stageNames, setStageNames] = useState<Record<string, string>>(defaultStageNames);
-  const [tempStageNames, setTempStageNames] = useState<Record<string, string>>(defaultStageNames);
+  // UI State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
+  const [selectedPipeline, setSelectedPipeline] = useState<string>('Geral');
+  const [activeMobileStage, setActiveMobileStage] = useState<LeadStage>(LeadStage.DRAFT);
+  const [mobileActionLead, setMobileActionLead] = useState<Lead | null>(null);
+  const [tempStageNames, setTempStageNames] = useState<Record<string, string>>(stageNames);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isEditStagesModalOpen, setIsEditStagesModalOpen] = useState(false);
+  const [isSellersModalOpen, setIsSellersModalOpen] = useState(false);
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [newLeadForm, setNewLeadForm] = useState({ name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '', ownerId: '' });
+  const [newLeadForm, setNewLeadForm] = useState({
+    name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '', ownerId: '', pipeline: 'Geral'
+  });
 
   // Bulk Selection
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [bulkOwnerId, setBulkOwnerId] = useState('');
 
-  // Sellers Management
-  const [isSellersModalOpen, setIsSellersModalOpen] = useState(false);
-  const [newSellerForm, setNewSellerForm] = useState({ name: '', phone: '' });
-
   const [importing, setImporting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const stageKeys = Object.values(LeadStage);
 
   useEffect(() => {
-    fetchEvents();
-    fetchTeam();
-    fetchLeads();
-    const savedStages = localStorage.getItem('nghub_crm_stages');
-    if (savedStages) {
-      try {
-        const parsed = JSON.parse(savedStages);
-        const merged = { ...defaultStageNames, ...parsed };
-        // Garante que a nova etapa de Rascunho seja incluída mesmo em caches antigos
-        if (!parsed[LeadStage.DRAFT]) merged[LeadStage.DRAFT] = defaultStageNames[LeadStage.DRAFT];
-        setStageNames(merged);
-        setTempStageNames(merged);
-      } catch (e) {
-        // Se der erro no parse, usa o default
-      }
+    if (location.state?.openModal) {
+      setIsAddModalOpen(true);
+      window.history.replaceState({}, document.title);
     }
-  }, []);
+  }, [location]);
 
-  const fetchTeam = async () => {
-    const { data } = await supabase.from('sellers').select('id, name, phone');
-    if (data) setTeam(data);
-  };
+  useEffect(() => {
+    setTempStageNames(stageNames);
+  }, [stageNames]);
 
-  const saveStageNames = () => {
-    setStageNames(tempStageNames);
-    localStorage.setItem('nghub_crm_stages', JSON.stringify(tempStageNames));
+  const handleSaveStageNames = () => {
+    saveStageNames(tempStageNames);
     setIsEditStagesModalOpen(false);
-    onNotify('success', 'Nomes das etapas atualizados!');
-  };
-
-  const fetchEvents = async () => {
-    const { data } = await supabase.from('events').select('id, title, price').order('date', { ascending: false });
-    if (data) setEvents(data as any);
-  };
-
-  const fetchLeads = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.from('leads').select('*, owner:sellers(name, phone)').order('created_at', { ascending: false });
-      if (error) throw error;
-
-      const mappedLeads: Lead[] = (data || []).map((l: any) => ({
-        id: l.id,
-        name: l.name,
-        email: l.email,
-        phone: l.phone,
-        company: l.company,
-        sector: l.sector,
-        stage: l.stage as LeadStage,
-        value: Number(l.value),
-        lastContact: l.last_contact,
-        tagId: l.tag_id,
-        ownerId: l.owner_id,
-        owner: l.owner ? { id: l.owner_id, name: l.owner.name, phone: l.owner.phone } : undefined,
-        createdAt: l.created_at,
-        instagram: l.instagram,
-        revenue_text: l.revenue_text,
-        headcount: l.headcount,
-        pain_point: l.pain_point,
-        origin: l.origin,
-        notes: l.notes
-      }));
-
-      setLeads(mappedLeads);
-    } catch (error) {
-      onNotify('error', 'Erro ao carregar leads.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const getTagStyle = useCallback((tagId?: string) => {
@@ -181,7 +122,8 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       (l.email || '').toLowerCase().includes(term) ||
       (l.phone || '').toLowerCase().includes(term);
     const matchesTag = selectedTagFilter === 'all' || l.tagId === selectedTagFilter;
-    return matchesSearch && matchesTag;
+    const matchesPipeline = (l.pipeline || 'Geral') === selectedPipeline;
+    return matchesSearch && matchesTag && matchesPipeline;
   });
 
   // Desktop Drag & Drop Logic
@@ -193,87 +135,9 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     e.preventDefault();
     const id = e.dataTransfer.getData('leadId');
     if (isBulkMode && selectedLeadIds.includes(id)) {
-      await handleBulkMove(targetStage);
+      await handleBulkMoveSubmit(targetStage);
     } else {
       await updateLeadStage(id, targetStage);
-    }
-  };
-
-  // Shared Logic for Stage Update
-  const updateLeadStage = async (id: string, targetStage: LeadStage) => {
-    const lead = leads.find(l => l.id === id);
-    if (lead && lead.stage !== targetStage) {
-      setLeads(leads.map(l => l.id === id ? { ...l, stage: targetStage } : l));
-      const { error } = await supabase.from('leads').update({ stage: targetStage }).eq('id', id);
-      if (error) fetchLeads();
-      else {
-        onNotify('success', `Lead movido para ${stageNames[targetStage]}`);
-        if (targetStage === LeadStage.WON) {
-          const eventPrice = lead.tagId ? (events.find(e => e.id === lead.tagId)?.price || lead.value) : lead.value;
-          if (eventPrice > 0) {
-            await supabase.from('transactions').insert([{ description: `Venda: ${lead.name}`, amount: eventPrice, type: 'income', category: 'CRM', date: new Date().toISOString() }]);
-          }
-        } else if ((lead.stage as string) === LeadStage.WON) {
-          // Se o lead saiu de Venda Fechada, remove a transação
-          await supabase.from('transactions')
-            .delete()
-            .eq('description', `Venda: ${lead.name}`)
-            .eq('category', 'CRM');
-        }
-      }
-    }
-    setMobileActionLead(null); // Fecha o menu mobile se estiver aberto
-  };
-
-  // Logic for Tag Update on Existing Lead
-  const handleUpdateLeadTag = async (leadId: string, tagId: string) => {
-    try {
-      const selectedEvent = events.find(e => e.id === tagId);
-      const newEventPrice = selectedEvent ? selectedEvent.price : 0;
-      const currentLead = leads.find(l => l.id === leadId);
-
-      // If the tag is removed (tagId === ''), reset value to 0. Otherwise use event price or keep current value.
-      const finalValueToSave = tagId === '' ? 0 : (newEventPrice > 0 ? newEventPrice : (currentLead?.value || 0));
-
-      const { error } = await supabase.from('leads').update({ tag_id: tagId || null, value: finalValueToSave }).eq('id', leadId);
-      if (error) throw error;
-
-      // Update local state
-      setLeads(leads.map(l => l.id === leadId ? { ...l, tagId: tagId || undefined, value: finalValueToSave } : l));
-
-      // Synchronize transaction if lead is WON
-      if (currentLead?.stage === LeadStage.WON && currentLead.name) {
-        // Verifica se já existe uma transação
-        const { data: existingTx } = await supabase.from('transactions')
-          .select('id')
-          .eq('description', `Venda: ${currentLead.name}`)
-          .eq('category', 'CRM')
-          .limit(1);
-
-        if (existingTx && existingTx.length > 0) {
-          if (finalValueToSave > 0) {
-            await supabase.from('transactions')
-              .update({ amount: finalValueToSave })
-              .eq('id', existingTx[0].id);
-          } else {
-            await supabase.from('transactions')
-              .delete()
-              .eq('id', existingTx[0].id);
-          }
-        } else if (finalValueToSave > 0) {
-          await supabase.from('transactions').insert([{ description: `Venda: ${currentLead.name}`, amount: finalValueToSave, type: 'income', category: 'CRM', date: new Date().toISOString() }]);
-        }
-      }
-
-      // Update selected lead context
-      if (selectedLead && selectedLead.id === leadId) {
-        setSelectedLead({ ...selectedLead, tagId: tagId || undefined, value: finalValueToSave });
-      }
-
-      onNotify('success', 'Etiqueta atualizada!');
-    } catch (error) {
-      console.error(error);
-      onNotify('error', 'Erro ao atualizar etiqueta.');
     }
   };
 
@@ -281,174 +145,51 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     if (!newLeadForm.name) return onNotify('error', 'O nome é obrigatório.');
     setIsSubmitting(true);
     try {
-      const selectedEvent = newLeadForm.tagId ? events.find(e => e.id === newLeadForm.tagId) : null;
-      const initialValue = selectedEvent?.price && selectedEvent.price > 0
-        ? selectedEvent.price
-        : (Number(newLeadForm.value) || 0);
-
-      const { data, error } = await supabase.from('leads').insert([{
+      await addLead({
         name: newLeadForm.name,
         company: newLeadForm.company,
         sector: newLeadForm.sector,
         email: newLeadForm.email,
         phone: newLeadForm.phone,
-        tag_id: newLeadForm.tagId || null,
-        owner_id: newLeadForm.ownerId || null,
+        tagId: newLeadForm.tagId,
+        ownerId: newLeadForm.ownerId,
         stage: LeadStage.NEW_LEAD,
-        value: initialValue
-      }]).select();
-
-      if (error) throw error;
-
-      onNotify('success', 'Lead adicionado!');
+        value: Number(newLeadForm.value) || 0,
+        pipeline: newLeadForm.pipeline
+      });
       setIsAddModalOpen(false);
-      setNewLeadForm({ name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '', ownerId: '' });
-      fetchLeads();
-    } catch (err) {
-      onNotify('error', 'Erro ao salvar lead.');
+      setNewLeadForm({ name: '', company: '', sector: '', email: '', phone: '', tagId: '', value: '', ownerId: '', pipeline: selectedPipeline });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleUpdateLeadOwner = async (leadId: string, ownerId: string) => {
-    try {
-      const { error } = await supabase.from('leads').update({ owner_id: ownerId || null }).eq('id', leadId);
-      if (error) throw error;
-
-      const newOwnerInfo = ownerId ? team.find(m => m.id === ownerId) : undefined;
-
-      setLeads(leads.map(l => l.id === leadId ? { ...l, ownerId: ownerId || undefined, owner: newOwnerInfo ? { id: newOwnerInfo.id, name: newOwnerInfo.name, phone: newOwnerInfo.phone } : undefined } : l));
-
-      if (selectedLead && selectedLead.id === leadId) {
-        setSelectedLead({ ...selectedLead, ownerId: ownerId || undefined, owner: newOwnerInfo ? { id: newOwnerInfo.id, name: newOwnerInfo.name, phone: newOwnerInfo.phone } : undefined });
-      }
-
-      onNotify('success', 'Responsável atualizado!');
-    } catch (error) {
-      console.error(error);
-      onNotify('error', 'Erro ao atualizar responsável.');
-    }
-  };
-
-  const toggleLeadSelection = (id: string) => {
-    setSelectedLeadIds(prev =>
-      prev.includes(id) ? prev.filter(leadId => leadId !== id) : [...prev, id]
-    );
-  };
-
-  const handleBulkAssign = async () => {
+  const handleBulkAssignSubmit = async () => {
     if (!bulkOwnerId) return onNotify('error', 'Selecione um responsável.');
-    if (selectedLeadIds.length === 0) return onNotify('error', 'Nenhum lead selecionado.');
-
-    try {
-      const { error } = await supabase.from('leads')
-        .update({ owner_id: bulkOwnerId })
-        .in('id', selectedLeadIds);
-
-      if (error) throw error;
-
-      const newOwnerInfo = team.find(m => m.id === bulkOwnerId);
-
-      // Update local state
-      setLeads(leads.map(l => selectedLeadIds.includes(l.id) ? { ...l, ownerId: bulkOwnerId, owner: newOwnerInfo ? { id: newOwnerInfo.id, name: newOwnerInfo.name, phone: newOwnerInfo.phone } : undefined } : l));
-
-      onNotify('success', `${selectedLeadIds.length} leads atribuídos!`);
-
-      // Trigger WhatsApp
-      if (newOwnerInfo?.phone) {
-        const cleanPhone = newOwnerInfo.phone.replace(/\D/g, '');
-        const message = encodeURIComponent(`Olá ${newOwnerInfo.name}, você tem ${selectedLeadIds.length} novos leads na NGHUB OS aguardando atendimento.`);
-        window.open(`https://wa.me/55${cleanPhone}?text=${message}`, '_blank');
-      }
-
-      setIsBulkMode(false);
-      setSelectedLeadIds([]);
-      setBulkOwnerId('');
-    } catch (err) { onNotify('error', 'Erro ao atribuir leads em lote.'); }
+    await bulkAssignLeads(selectedLeadIds, bulkOwnerId);
+    setIsBulkMode(false);
+    setSelectedLeadIds([]);
+    setBulkOwnerId('');
   };
 
-  const handleBulkMove = async (targetStage: LeadStage) => {
-    if (selectedLeadIds.length === 0) return onNotify('error', 'Nenhum lead selecionado.');
-
-    try {
-      const { error } = await supabase.from('leads')
-        .update({ stage: targetStage })
-        .in('id', selectedLeadIds);
-
-      if (error) throw error;
-
-      setLeads(leads.map(l => selectedLeadIds.includes(l.id) ? { ...l, stage: targetStage } : l));
-      onNotify('success', `${selectedLeadIds.length} leads movidos para ${stageNames[targetStage]}!`);
-
-      setIsBulkMode(false);
-      setSelectedLeadIds([]);
-    } catch (err) { onNotify('error', 'Erro ao mover leads em lote.'); }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedLeadIds.length === 0) return onNotify('error', 'Nenhum lead selecionado.');
-    if (!window.confirm(`Tem certeza que deseja excluir ${selectedLeadIds.length} leads permanentemente?`)) return;
-
-    try {
-      const { error } = await supabase.from('leads')
-        .delete()
-        .in('id', selectedLeadIds);
-
-      if (error) throw error;
-
-      setLeads(leads.filter(l => !selectedLeadIds.includes(l.id)));
-      onNotify('success', `${selectedLeadIds.length} leads excluídos!`);
-
-      setIsBulkMode(false);
-      setSelectedLeadIds([]);
-    } catch (err) {
-      console.error('Delete error:', err);
-      onNotify('error', 'Erro ao excluir leads em lote.');
+  const handleBulkMoveSubmit = async (targetStage: LeadStage) => {
+    for (const id of selectedLeadIds) {
+      await updateLeadStage(id, targetStage);
     }
+    setIsBulkMode(false);
+    setSelectedLeadIds([]);
+    onNotify('success', `${selectedLeadIds.length} leads movidos!`);
   };
 
-  const handleDeleteLead = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este lead permanentemente?')) return;
-    try {
-      const { error } = await supabase.from('leads').delete().eq('id', id);
-      if (error) throw error;
-      setLeads(leads.filter(l => l.id !== id));
-      if (selectedLead?.id === id) {
-        setIsDetailModalOpen(false);
-        setSelectedLead(null);
-      }
-      onNotify('success', 'Lead excluído com sucesso!');
-    } catch (err) {
-      console.error('Delete error:', err);
-      onNotify('error', 'Erro ao excluir lead.');
+  const handleBulkDeleteSubmit = async () => {
+    if (!window.confirm(`Excluir ${selectedLeadIds.length} leads?`)) return;
+    const { error } = await supabase.from('leads').delete().in('id', selectedLeadIds);
+    if (!error) {
+      refreshLeads();
+      setIsBulkMode(false);
+      setSelectedLeadIds([]);
+      onNotify('success', 'Leads excluídos!');
     }
-  };
-
-
-  const handleAddSeller = async () => {
-    if (!newSellerForm.name || !newSellerForm.phone) return onNotify('error', 'Nome e telefone (WhatsApp) são obrigatórios.');
-    try {
-      const { error } = await supabase.from('sellers').insert([{
-        name: newSellerForm.name,
-        phone: newSellerForm.phone
-      }]);
-      if (error) throw error;
-      onNotify('success', 'Vendedor adicionado!');
-      setNewSellerForm({ name: '', phone: '' });
-      fetchTeam(); // Refresh team list
-    } catch (err) { onNotify('error', 'Erro ao adicionar vendedor.'); }
-  };
-
-  const handleDeleteSeller = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja remover este vendedor? Leads sob sua responsabilidade perderão este vínculo.')) return;
-    try {
-      const { error } = await supabase.from('sellers').delete().eq('id', id);
-      if (error) throw error;
-      onNotify('success', 'Vendedor removido!');
-      fetchTeam();
-      fetchLeads(); // Sync leads that might have lost their owner
-    } catch (err) { onNotify('error', 'Erro ao remover vendedor.'); }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -463,7 +204,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       const leadsToInsert = jsonData.map(row => ({
         name: row.Nome || row.name || 'Sem Nome',
         email: row.Email || row.email,
-        phone: row.Telefone || row.phone,
+        phone: String(row.Telefone || row.phone || ''),
         company: row.Empresa || row.company,
         sector: row.Setor || row.sector,
         stage: LeadStage.NEW_LEAD,
@@ -474,9 +215,53 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       if (error) throw error;
       onNotify('success', `${leadsToInsert.length} leads importados!`);
       setIsImportModalOpen(false);
-      fetchLeads();
+      refreshLeads();
     } catch (err) { onNotify('error', 'Erro na importação.'); }
     finally { setImporting(false); }
+  };
+
+  const handleExportLeads = () => {
+    try {
+      if (filteredLeads.length === 0) {
+        onNotify('info', 'Nenhum lead para exportar.');
+        return;
+      }
+
+      const dataToExport = filteredLeads.map(l => ({
+        'Nome': l.name,
+        'Email': l.email,
+        'Telefone': l.phone,
+        'Empresa': l.company,
+        'Setor': l.sector,
+        'Fase': stageNames[l.stage] || l.stage,
+        'Valor (R$)': l.tagId ? (events.find(e => e.id === l.tagId)?.price || l.value) : l.value,
+        'Etiqueta': getEventName(l.tagId) || 'Sem etiqueta',
+        'Responsável': l.owner?.name || 'Sem responsável',
+        'Pipeline': l.pipeline || 'Geral',
+        'Data de Criação': new Date(l.createdAt || '').toLocaleDateString('pt-BR')
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+      XLSX.writeFile(wb, `Leads_${selectedPipeline}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      onNotify('success', '100% Funcional! Leads exportados.');
+    } catch (err) {
+      onNotify('error', 'Erro ao exportar leads.');
+    }
+  };
+
+  const handleDeleteLead = async (id: string) => {
+    if (!window.confirm('Tem certeza?')) return;
+    const { error } = await supabase.from('leads').delete().eq('id', id);
+    if (!error) {
+      refreshLeads();
+      onNotify('success', 'Lead excluído!');
+      if (selectedLead?.id === id) {
+        setIsDetailModalOpen(false);
+        setSelectedLead(null);
+      }
+    }
   };
 
   // Helper for quick actions
@@ -485,6 +270,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     const cleanPhone = phone.replace(/\D/g, '');
     window.open(`https://wa.me/55${cleanPhone}`, '_blank');
   }, [onNotify]);
+
+  // Navegar para Conversas com o lead já aberto
+  const openInternalChat = useCallback((phone?: string) => {
+    if (!phone) return onNotify('info', 'Sem telefone cadastrado');
+    const cleanPhone = phone.replace(/\D/g, '');
+    navigate(`/messaging?phone=${cleanPhone}`);
+  }, [onNotify, navigate]);
 
   const openPhone = useCallback((phone?: string) => {
     if (!phone) return onNotify('info', 'Sem telefone cadastrado');
@@ -507,8 +299,25 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
 
         {/* Mobile Search & Controls Row */}
         <div className="flex w-full md:w-auto items-center gap-2 flex-wrap">
+          {/* Pipeline Filter */}
+          <div className="relative group flex-1 md:flex-none min-w-[120px]">
+            <Select
+              value={selectedPipeline}
+              onChange={(e) => {
+                setSelectedPipeline(e.target.value);
+                setNewLeadForm(prev => ({ ...prev, pipeline: e.target.value }));
+              }}
+              options={[
+                { value: 'Geral', label: 'Pipeline: Geral' },
+                { value: 'Evento', label: 'Pipeline: Evento' },
+                { value: 'Produto', label: 'Pipeline: Produto' }
+              ]}
+              icon={<Briefcase className="w-4 h-4" />}
+            />
+          </div>
+
           {/* Tag Filter */}
-          <div className="relative group flex-1 md:flex-none min-w-[200px]">
+          <div className="relative group flex-1 md:flex-none min-w-[180px]">
             <Select
               value={selectedTagFilter}
               onChange={(e) => setSelectedTagFilter(e.target.value)}
@@ -528,6 +337,12 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
             >
               <CheckCircle className="w-4 h-4" />
               <span className="hidden lg:inline">{isBulkMode ? 'Cancelar Seleção' : 'Selecionar Vários'}</span>
+            </button>
+            <button onClick={() => setIsImportModalOpen(true)} className="p-2.5 text-zinc-400 hover:text-brand-gold bg-zinc-900 border border-zinc-800 rounded-lg transition-colors" title="Importar Leads">
+              <Upload className="w-4 h-4" />
+            </button>
+            <button onClick={handleExportLeads} className="p-2.5 text-zinc-400 hover:text-brand-gold bg-zinc-900 border border-zinc-800 rounded-lg transition-colors" title="Exportar Leads (XLSX)">
+              <Download className="w-4 h-4" />
             </button>
             <button onClick={() => setIsSellersModalOpen(true)} className="p-2.5 text-zinc-400 hover:text-brand-gold bg-zinc-900 border border-zinc-800 rounded-lg transition-colors" title="Gerenciar Equipe / Responsáveis">
               <UserPlus className="w-4 h-4" />
@@ -723,7 +538,11 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-4 gap-2 mb-6">
+              <button onClick={() => openInternalChat(mobileActionLead.phone)} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-zinc-900 border border-zinc-800 active:bg-zinc-800 active:border-brand-gold/30 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-violet-500/10 text-violet-400 flex items-center justify-center border border-violet-500/20"><MessageSquare className="w-5 h-5" /></div>
+                <span className="text-xs font-medium text-zinc-300">Conversar</span>
+              </button>
               <button onClick={() => openWhatsApp(mobileActionLead.phone)} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-zinc-900 border border-zinc-800 active:bg-zinc-800 active:border-brand-gold/30 transition-colors">
                 <div className="w-10 h-10 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center border border-green-500/20"><MessageCircle className="w-5 h-5" /></div>
                 <span className="text-xs font-medium text-zinc-300">WhatsApp</span>
@@ -829,202 +648,35 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         isSubmitting={isSubmitting}
       />
 
-      {/* Edit Stages Modal */}
-      <Modal isOpen={isEditStagesModalOpen} onClose={() => setIsEditStagesModalOpen(false)} title="Configurar Etapas do CRM" footer={
-        <>
-          <Button variant="ghost" onClick={() => setIsEditStagesModalOpen(false)}>Cancelar</Button>
-          <Button variant="primary" onClick={saveStageNames}>Salvar Alterações</Button>
-        </>
-      }>
-        <div className="space-y-4">
-          <p className="text-xs text-zinc-500 mb-4">Personalize os nomes das colunas do seu funil de vendas.</p>
-          {stageKeys.map((key) => (
-            <div key={key}>
-              <Input
-                label={`Etapa ${key}`}
-                value={tempStageNames[key]}
-                onChange={(e) => setTempStageNames({ ...tempStageNames, [key]: e.target.value })}
-              />
-            </div>
-          ))}
-        </div>
-      </Modal>
+      <EditStagesModal
+        isOpen={isEditStagesModalOpen}
+        onClose={() => setIsEditStagesModalOpen(false)}
+        stageKeys={stageKeys}
+        tempStageNames={tempStageNames}
+        setTempStageNames={setTempStageNames}
+        onSave={handleSaveStageNames}
+      />
 
-      {/* Gerenciar Equipe (Sellers) Modal */}
-      <Modal isOpen={isSellersModalOpen} onClose={() => setIsSellersModalOpen(false)} title="Equipe de Vendas (Responsáveis)">
-        <div className="space-y-6">
-          <p className="text-xs text-zinc-500">Cadastre o nome e WhatsApp dos responsáveis para poder distribuir leads e notificá-los com 1 clique.</p>
+      <SellersModal
+        isOpen={isSellersModalOpen}
+        onClose={() => setIsSellersModalOpen(false)}
+        team={team}
+        onAddSeller={addSeller}
+        onDeleteSeller={deleteSeller}
+      />
 
-          <div className="bg-zinc-900/50 p-4 border border-zinc-800 rounded-xl space-y-4">
-            <h4 className="text-sm font-bold text-white mb-2">Novo Vendedor</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                placeholder="Nome Ex: João"
-                value={newSellerForm.name}
-                onChange={(e) => setNewSellerForm({ ...newSellerForm, name: e.target.value })}
-                icon={<UserPlus className="w-4 h-4" />}
-              />
-              <Input
-                placeholder="WhatsApp (com DDD)"
-                value={newSellerForm.phone}
-                onChange={(e) => setNewSellerForm({ ...newSellerForm, phone: e.target.value })}
-                icon={<Phone className="w-4 h-4" />}
-              />
-            </div>
-            <Button onClick={handleAddSeller} variant="primary" className="w-full">Cadastrar Membro</Button>
-          </div>
-
-          <div className="space-y-2 mt-4 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
-            <h4 className="text-sm font-bold text-white mb-3">Membros Cadastrados ({team.length})</h4>
-            {team.length === 0 ? (
-              <p className="text-xs text-zinc-500 text-center py-4">Nenhum membro cadastrado ainda.</p>
-            ) : (
-              team.map(member => (
-                <div key={member.id} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                  <div>
-                    <p className="text-sm font-bold text-zinc-200">{member.name}</p>
-                    <p className="text-xs text-brand-gold font-mono">{member.phone}</p>
-                  </div>
-                  <button onClick={() => handleDeleteSeller(member.id)} className="p-2 text-zinc-500 hover:bg-red-500/10 hover:text-red-500 transition-colors rounded-lg">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </Modal>
-
-      {/* Lead Detail Modal */}
-      <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Detalhes do Lead">
-        {selectedLead && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center text-xl font-bold text-brand-gold border border-zinc-700">
-                {selectedLead.name.charAt(0)}
-              </div>
-              <div className="flex-[1]">
-                <h3 className="text-xl font-serif font-bold text-white">{selectedLead.name}</h3>
-                <p className="text-zinc-400 text-sm">{selectedLead.company} • {selectedLead.sector}</p>
-
-                {/* Value display */}
-                {(() => {
-                  const displayPrice = selectedLead.tagId ? (events.find(e => e.id === selectedLead.tagId)?.price || selectedLead.value) : selectedLead.value;
-                  if (displayPrice > 0) {
-                    return <p className="text-emerald-400 font-mono text-sm mt-1">R$ {displayPrice.toLocaleString('pt-BR')}</p>;
-                  }
-                  return null;
-                })()}
-              </div>
-            </div>
-
-            {/* TAG E OWNER EDITING SECTION */}
-            <div className="mt-4 pt-4 border-t border-zinc-800 grid gap-4">
-              <Select
-                label="Etiqueta (Evento)"
-                value={selectedLead.tagId || ''}
-                onChange={(e) => handleUpdateLeadTag(selectedLead.id, e.target.value)}
-                options={[
-                  { value: '', label: 'Sem etiqueta' },
-                  ...events.map(ev => ({ value: ev.id, label: ev.title }))
-                ]}
-              />
-
-              <div className="space-y-2">
-                <Select
-                  label="Responsável"
-                  value={selectedLead.ownerId || ''}
-                  onChange={(e) => handleUpdateLeadOwner(selectedLead.id, e.target.value)}
-                  options={[
-                    { value: '', label: 'Sem responsável' },
-                    ...team.map(member => ({ value: member.id, label: member.name }))
-                  ]}
-                />
-                {selectedLead.ownerId && selectedLead.owner?.phone && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-green-500 hover:text-green-400 hover:bg-green-500/10 border border-green-500/20"
-                    onClick={() => {
-                      const message = encodeURIComponent(`Olá ${selectedLead.owner?.name}, você tem um novo lead na NGHUB OS: ${selectedLead.name}.`);
-                      window.open(`https://wa.me/55${selectedLead.owner?.phone?.replace(/\\D/g, '')}?text=${message}`, '_blank');
-                    }}
-                  >
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Notificar Responsável
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              {selectedLead.origin && (
-                <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
-                  <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Origem</span>
-                  <span className="text-sm text-zinc-300">{selectedLead.origin}</span>
-                </div>
-              )}
-              {selectedLead.instagram && (
-                <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
-                  <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Instagram</span>
-                  <a href={`https://instagram.com/${selectedLead.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-gold hover:underline">
-                    {selectedLead.instagram}
-                  </a>
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mt-2">
-              {selectedLead.headcount && (
-                <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
-                  <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Tamanho da Equipe</span>
-                  <span className="text-sm text-zinc-300">{selectedLead.headcount}</span>
-                </div>
-              )}
-              {selectedLead.revenue_text && (
-                <div className="bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
-                  <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Faturamento</span>
-                  <span className="text-sm text-zinc-300">{selectedLead.revenue_text}</span>
-                </div>
-              )}
-            </div>
-
-            {selectedLead.pain_point && (
-              <div className="mt-2 bg-zinc-900/50 p-3 rounded-xl border border-zinc-800">
-                <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-1">Desafios / Pain Point</span>
-                <p className="text-sm text-zinc-300 whitespace-pre-wrap">{selectedLead.pain_point}</p>
-              </div>
-            )}
-
-            <div className="mt-4 pt-4 border-t border-zinc-800">
-              <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-2">Anotações</span>
-              <textarea
-                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 text-zinc-200 focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20 custom-scrollbar text-sm min-h-[100px] resize-y"
-                placeholder="Insira anotações sobre esse lead..."
-                value={selectedLead.notes || ''}
-                onChange={async (e) => {
-                  const val = e.target.value;
-                  setSelectedLead({ ...selectedLead, notes: val });
-                  // Em produção seria melhor um debounce, mas para este caso:
-                  setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, notes: val } : l));
-                  await supabase.from('leads').update({ notes: val }).eq('id', selectedLead.id);
-                }}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800">
-              <button onClick={() => openWhatsApp(selectedLead.phone)} className="flex items-center justify-center gap-2 bg-green-900/20 text-green-500 p-3 rounded-lg border border-green-900/30 font-bold text-sm hover:bg-green-900/30 transition-colors"><MessageCircle className="w-4 h-4" /> WhatsApp</button>
-              <button onClick={() => openEmail(selectedLead.email)} className="flex items-center justify-center gap-2 bg-zinc-800 text-white p-3 rounded-lg border border-zinc-700 font-bold text-sm hover:bg-zinc-700 transition-colors"><Mail className="w-4 h-4" /> Email</button>
-            </div>
-
-            <div className="pt-2">
-              <Button onClick={() => handleDeleteLead(selectedLead.id)} variant="ghost" className="w-full text-red-500 hover:text-red-400 hover:bg-red-500/10 border border-red-500/20">
-                <Trash2 className="w-4 h-4 mr-2" /> Excluir Lead
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <LeadDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        selectedLead={selectedLead}
+        events={events}
+        team={team}
+        onUpdateTag={updateLeadTag}
+        onUpdateOwner={updateLeadOwner}
+        onUpdateNotes={updateLeadNotes}
+        onUpdateValue={updateLeadValue}
+        onDeleteLead={handleDeleteLead}
+      />
 
       {/* FLOATING BULK ACTION BAR */}
       {isBulkMode && selectedLeadIds.length > 0 && (
@@ -1043,7 +695,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
               ]}
             />
             {bulkOwnerId && (
-              <Button onClick={handleBulkAssign} variant="primary" size="md" className="whitespace-nowrap px-4">
+              <Button onClick={handleBulkAssignSubmit} variant="primary" size="md" className="whitespace-nowrap px-4">
                 Atribuir
               </Button>
             )}
@@ -1053,7 +705,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
             <Select
               value=""
               onChange={(e) => {
-                if (e.target.value) handleBulkMove(e.target.value as LeadStage);
+                if (e.target.value) handleBulkMoveSubmit(e.target.value as LeadStage);
               }}
               options={[
                 { value: '', label: 'Mover para...' },
@@ -1063,14 +715,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
 
             <div className="w-px h-8 bg-zinc-800 mx-2 hidden sm:block"></div>
 
-            <Button onClick={handleBulkDelete} variant="ghost" size="md" className="whitespace-nowrap text-red-500 hover:bg-red-500/10 border border-red-500/20 px-4">
+            <Button onClick={handleBulkDeleteSubmit} variant="ghost" size="md" className="whitespace-nowrap text-red-500 hover:bg-red-500/10 border border-red-500/20 px-4">
               <Trash2 className="w-4 h-4 mr-2" />
               Excluir
             </Button>
           </div>
         </div>
       )}
-
     </div>
   );
 };

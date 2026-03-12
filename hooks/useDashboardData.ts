@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { LeadStage } from '../types';
+import { LeadStage, Transaction, FinanceSettings } from '../types';
 
 // ── Local types used by the dashboard hook ──────────────────────────────────
 export interface ChartDataPoint { name: string; value: number; }
@@ -13,11 +13,12 @@ export interface ActivityItem {
     status: 'success' | 'danger' | 'neutral';
 }
 
-interface TransactionRow { type: string; amount: number; description: string; date: string; }
+// interface TransactionRow deleted - using Transaction from types.ts
 interface LeadRow { stage: string; name: string; created_at: string; }
 interface UpcomingEventRow { date: string; title: string; }
+export type TimeFilter = 'today' | '7d' | '15d' | '30d' | 'all';
 
-export const useDashboardData = () => {
+export const useDashboardData = (timeFilter: TimeFilter = 'all') => {
     const [loading, setLoading] = useState(true);
     const [kpis, setKpis] = useState({
         revenue: 0,
@@ -33,32 +34,69 @@ export const useDashboardData = () => {
     const [funnelData, setFunnelData] = useState<FunnelDataPoint[]>([]);
     const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
 
-    useEffect(() => {
-        fetchDashboardData();
-    }, []);
-
     const fetchDashboardData = useCallback(async () => {
         try {
             const [
                 { data: trans },
                 { data: leads },
                 { data: events },
-                { data: upcomingEvents }
+                { data: upcomingEvents },
+                resSettings
             ] = await Promise.all([
                 supabase.from('transactions').select('*').order('date', { ascending: true }),
-                supabase.from('leads').select('*, tag:events(price)'),
-                supabase.from('events').select('id, price'),
-                supabase.from('events').select('*').eq('status', 'upcoming').order('date', { ascending: true }).limit(1)
+                supabase.from('leads').select('*, tag:events(price, title)'),
+                supabase.from('events').select('id, price, title'),
+                supabase.from('events').select('*').eq('status', 'upcoming').order('date', { ascending: true }).limit(1),
+                supabase.from('finance_settings').select('*').limit(1).single()
             ]);
 
-            // 1. Financeiro (Transactions)
-            const transactions: TransactionRow[] = trans || [];
-            const revenue = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + Number(curr.amount), 0);
-            const expenses = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0);
+            const settings: FinanceSettings | null = (resSettings as any)?.data;
+            const taxRate = (settings?.tax_rate || 0) / 100;
+            const fixedCosts = Array.isArray(settings?.fixed_costs) ? settings.fixed_costs : [];
+            const fixedCostsTotal = fixedCosts.reduce((acc, c) => acc + Number(c.amount), 0);
+
+            // Filtro de tempo local
+            const now = new Date();
+            const filterDate = new Date();
+            if (timeFilter === 'today') filterDate.setHours(0, 0, 0, 0);
+            else if (timeFilter === '7d') filterDate.setDate(now.getDate() - 7);
+            else if (timeFilter === '15d') filterDate.setDate(now.getDate() - 15);
+            else if (timeFilter === '30d') filterDate.setDate(now.getDate() - 30);
+
+            const transactionsList: Transaction[] = trans || [];
+            const filteredTransactions = timeFilter === 'all'
+                ? transactionsList
+                : transactionsList.filter(t => new Date(t.date) >= filterDate);
+
+            const allLeads = leads || [];
+            const leadsList = timeFilter === 'all'
+                ? allLeads
+                : allLeads.filter(l => new Date(l.created_at) >= filterDate);
+
+            // 1. Financeiro (Transactions & Receita)
+            // Nova regra: Somar apenas Leads com Venda Fechada e etiqueta contendo BASE ou MASTERS
+            let grossRevenue = 0;
+            leadsList.forEach(l => {
+                if (l.stage === LeadStage.WON || l.stage === 'Membro Ativo') {
+                    const eventTitle = (l.tag?.title || '').toUpperCase();
+                    // Se for um evento NG.BASE ou MASTERS, computamos o lucro
+                    if (eventTitle.includes('BASE') || eventTitle.includes('MASTERS')) {
+                        // Prioriza o valor manual do lead, se disponível e maior que zero
+                        const price = (Number(l.value) > 0) ? Number(l.value) : (l.tag?.price || 0);
+                        grossRevenue += price;
+                    }
+                }
+            });
+
+            const taxes = grossRevenue * taxRate;
+            const netRevenue = grossRevenue - taxes;
+            const variableExpenses = filteredTransactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0);
+            const totalExpenses = variableExpenses + fixedCostsTotal;
+            const netIncome = netRevenue - variableExpenses - fixedCostsTotal;
 
             // Preparar dados para o gráfico de fluxo
             const chartMap: Record<string, number> = {};
-            transactions.forEach(t => {
+            filteredTransactions.forEach(t => {
                 const date = new Date(t.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
                 const val = t.type === 'income' ? Number(t.amount) : -Number(t.amount);
                 chartMap[date] = (chartMap[date] || 0) + val;
@@ -66,7 +104,6 @@ export const useDashboardData = () => {
             const chart = Object.keys(chartMap).slice(-7).map(key => ({ name: key, value: chartMap[key] }));
 
             // 2. CRM (Leads)
-            const leadsList: LeadRow[] = leads || [];
             const totalLeads = leadsList.length;
 
             // Get Custom Stage Names from LocalStorage or use Default
@@ -104,7 +141,7 @@ export const useDashboardData = () => {
 
             // 4. Atividade Recente
             const activity: ActivityItem[] = [
-                ...transactions.slice(-3).map(t => ({
+                ...filteredTransactions.slice(-3).map(t => ({
                     type: 'finance' as const,
                     title: t.description,
                     value: `R$ ${t.amount}`,
@@ -121,9 +158,9 @@ export const useDashboardData = () => {
             ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
             setKpis({
-                revenue,
-                expenses,
-                netIncome: revenue - expenses,
+                revenue: grossRevenue,
+                expenses: totalExpenses,
+                netIncome,
                 activeLeads: wonLeads,
                 totalLeads,
                 conversionRate: totalLeads > 0 ? (wonLeads / totalLeads) * 100 : 0,
@@ -139,7 +176,11 @@ export const useDashboardData = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [timeFilter]);
+
+    useEffect(() => {
+        fetchDashboardData();
+    }, [timeFilter, fetchDashboardData]);
 
     return { loading, kpis, chartData, funnelData, recentActivity };
 };

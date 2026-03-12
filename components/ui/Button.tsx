@@ -5,7 +5,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
     size?: 'sm' | 'md' | 'lg';
     isLoading?: boolean;
-    icon?: LucideIcon;
+    icon?: React.ReactNode | LucideIcon;
     iconPosition?: 'left' | 'right';
 }
 
@@ -14,12 +14,13 @@ export const Button: React.FC<ButtonProps> = ({
     variant = 'primary',
     size = 'md',
     isLoading = false,
-    icon: Icon,
     iconPosition = 'left',
     className = '',
     disabled,
+    icon,
     ...props
 }) => {
+    const Icon = icon as any;
     const baseStyles = "inline-flex items-center justify-center font-semibold tracking-wide transition-all duration-200 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-darker disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-[0.98] select-none";
 
     const variants: Record<string, string> = {
@@ -44,8 +45,21 @@ export const Button: React.FC<ButtonProps> = ({
 
     const renderIcon = () => {
         if (isLoading) return <Loader2 className={`${iconSize[size]} animate-spin`} />;
-        if (Icon) return <Icon className={iconSize[size]} />;
-        return null;
+        if (!icon) return null;
+
+        // Se for uma função ou um componente (objeto com $$typeof/render, como Lucide icons)
+        if (typeof icon === 'function' || (typeof icon === 'object' && icon !== null && (icon as any).$$typeof)) {
+            const IconComp = icon as any;
+            return <IconComp className={iconSize[size]} />;
+        }
+
+        if (React.isValidElement(icon)) {
+            return React.cloneElement(icon as React.ReactElement, {
+                className: `${iconSize[size]} ${(icon.props as any).className || ''}`
+            });
+        }
+
+        return icon;
     };
 
     return (

@@ -16,6 +16,7 @@ interface LeadFormState {
     tagId: string;
     value: string;
     ownerId: string;
+    pipeline: string;
 }
 
 interface LeadFormModalProps {
@@ -128,6 +129,26 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                                     {ev.title} {ev.price > 0 && `(R$ ${ev.price})`}
                                 </option>
                             ))}
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-zinc-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* Pipeline Selection */}
+                <div className="relative">
+                    <label htmlFor="pipeline-select" className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-1.5 opacity-70">
+                        Pipeline
+                    </label>
+                    <div className="relative">
+                        <select
+                            id="pipeline-select"
+                            value={formData.pipeline}
+                            onChange={(e) => setFormData({ ...formData, pipeline: e.target.value })}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-zinc-200 focus:border-brand-gold focus:outline-none focus:ring-1 focus:ring-brand-gold/20 text-sm appearance-none shadow-inner transition-all hover:border-zinc-700"
+                        >
+                            <option value="Geral">Geral</option>
+                            <option value="Evento">Evento</option>
+                            <option value="Produto">Produto</option>
                         </select>
                         <ChevronDown className="w-4 h-4 text-zinc-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>

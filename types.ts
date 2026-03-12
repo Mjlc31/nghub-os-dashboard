@@ -46,6 +46,7 @@ export interface Lead {
   pain_point?: string;
   origin?: string;
   notes?: string;
+  pipeline?: string;
 }
 
 export interface Event {
@@ -77,6 +78,23 @@ export interface Transaction {
   date: string;
   category: string;
   status: 'paid' | 'pending' | 'failed';
+  due_date?: string;
+  recurrence?: 'once' | 'monthly' | 'annual';
+}
+
+export interface FixedCost {
+  id: string;
+  name: string;
+  amount: number;
+  category: string;
+}
+
+export interface FinanceSettings {
+  id?: string;
+  tax_rate: number;
+  tax_regime: 'simples' | 'presumido' | 'real';
+  fixed_costs: FixedCost[];
+  updated_at?: string;
 }
 
 export interface Campaign {

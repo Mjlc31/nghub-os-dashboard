@@ -77,6 +77,8 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
                 ownerId: l.owner_id,
                 owner: l.owner ? { id: l.owner_id, name: l.owner.name, phone: l.owner.phone } : undefined,
                 createdAt: l.created_at,
+                notes: l.notes || '',
+                pipeline: l.pipeline || 'Geral',
             }));
 
             setLeads(mappedLeads);
@@ -147,6 +149,52 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         }
     };
 
+    const updateLeadNotes = async (leadId: string, notes: string) => {
+        const { error } = await supabase.from('leads').update({ notes }).eq('id', leadId);
+        if (!error) {
+            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, notes } : l));
+        } else {
+            onNotify?.('error', 'Erro ao salvar anotação.');
+        }
+    };
+
+    const updateLeadValue = async (leadId: string, value: number) => {
+        try {
+            const { error } = await supabase.from('leads').update({ value }).eq('id', leadId);
+            if (error) throw error;
+
+            const currentLead = leads.find(l => l.id === leadId);
+            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, value } : l));
+
+            // Sync transaction if lead is WON
+            if (currentLead?.stage === LeadStage.WON && currentLead.name) {
+                const { data: existingTx } = await supabase.from('transactions')
+                    .select('id')
+                    .eq('description', `Venda: ${currentLead.name}`)
+                    .eq('category', 'CRM')
+                    .limit(1);
+
+                if (existingTx && existingTx.length > 0) {
+                    if (value > 0) {
+                        await supabase.from('transactions').update({ amount: value }).eq('id', existingTx[0].id);
+                    } else {
+                        await supabase.from('transactions').delete().eq('id', existingTx[0].id);
+                    }
+                } else if (value > 0) {
+                    await supabase.from('transactions').insert([{ 
+                        description: `Venda: ${currentLead.name}`, 
+                        amount: value, 
+                        type: 'income', 
+                        category: 'CRM', 
+                        date: new Date().toISOString() 
+                    }]);
+                }
+            }
+        } catch (error) {
+            onNotify?.('error', 'Erro ao atualizar valor.');
+        }
+    };
+
     const updateLeadOwner = async (leadId: string, ownerId: string) => {
         try {
             const { error } = await supabase.from('leads').update({ owner_id: ownerId || null }).eq('id', leadId);
@@ -180,7 +228,8 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
                 tag_id: leadData.tagId || null,
                 owner_id: leadData.ownerId || null,
                 stage: leadData.stage,
-                value: initialValue
+                value: initialValue,
+                pipeline: leadData.pipeline || 'Geral'
             }]).select();
 
             if (error) throw error;
@@ -248,6 +297,8 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         updateLeadStage,
         updateLeadTag,
         updateLeadOwner,
+        updateLeadNotes,
+        updateLeadValue,
         addLead,
         bulkAssignLeads,
         addSeller,
