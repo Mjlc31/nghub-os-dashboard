@@ -47,19 +47,20 @@ export const Button: React.FC<ButtonProps> = ({
         if (isLoading) return <Loader2 className={`${iconSize[size]} animate-spin`} />;
         if (!icon) return null;
 
-        // Se for uma função ou um componente (objeto com $$typeof/render, como Lucide icons)
-        if (typeof icon === 'function' || (typeof icon === 'object' && icon !== null && (icon as any).$$typeof)) {
-            const IconComp = icon as any;
-            return <IconComp className={iconSize[size]} />;
-        }
-
+        // Se já for um elemento React (ex: <Plus />)
         if (React.isValidElement(icon)) {
             return React.cloneElement(icon as React.ReactElement, {
                 className: `${iconSize[size]} ${(icon.props as any).className || ''}`
             });
         }
 
-        return icon;
+        // Se for uma função de componente ou um componente forwardRef (como Lucide icons)
+        if (typeof icon === 'function' || (typeof icon === 'object' && icon !== null && (icon as any).render)) {
+            const IconComp = icon as any;
+            return <IconComp className={iconSize[size]} />;
+        }
+
+        return icon as React.ReactNode;
     };
 
     return (
