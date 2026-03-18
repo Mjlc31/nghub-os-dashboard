@@ -47,6 +47,7 @@ export interface Lead {
   origin?: string;
   notes?: string;
   pipeline?: string;
+  productLabel?: string;
 }
 
 export interface Event {

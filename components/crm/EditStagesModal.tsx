@@ -11,13 +11,20 @@ interface EditStagesModalProps {
     tempStageNames: Record<string, string>;
     setTempStageNames: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     onSave: () => void;
+    pipelineName?: string;
 }
 
 export const EditStagesModal: React.FC<EditStagesModalProps> = ({
-    isOpen, onClose, stageKeys, tempStageNames, setTempStageNames, onSave
+    isOpen, onClose, stageKeys, tempStageNames, setTempStageNames, onSave, pipelineName
 }) => {
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Editar Nomes das Etapas">
+        <Modal isOpen={isOpen} onClose={onClose} title={`Editar Etapas — Pipeline ${pipelineName || 'Geral'}`}>
+            <div className="space-y-1 mb-4">
+                <p className="text-xs text-zinc-500">
+                    As alterações se aplicam <strong className="text-zinc-300">somente</strong> à pipeline <strong className="text-brand-gold">{pipelineName || 'Geral'}</strong>.
+                    Outras pipelines não serão afetadas.
+                </p>
+            </div>
             <div className="space-y-4">
                 {stageKeys.map(stage => (
                     <Input

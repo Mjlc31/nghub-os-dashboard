@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Legend, PieChart, Pie, Cell
+  CartesianGrid, Legend, PieChart, Pie, Cell,
+  LineChart, Line, Area, AreaChart, ReferenceLine
 } from 'recharts';
 import {
   ArrowUpRight, ArrowDownRight, Download, Plus, Loader2, FileText,
   LayoutDashboard, Trash2, Settings, Edit3, AlertCircle, CheckCircle,
-  Clock, TrendingUp, TrendingDown, X, Save
+  Clock, TrendingUp, TrendingDown, X, Save, Brain, Target, Zap, Filter
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { Transaction, FinanceSettings, FixedCost } from '../types';
@@ -81,9 +82,17 @@ const DEFAULT_SETTINGS: FinanceSettings = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Finance: React.FC = () => {
-  const [viewMode, setViewMode] = useState<'cashflow' | 'dre'>('cashflow');
+  const [viewMode, setViewMode] = useState<'cashflow' | 'dre' | 'intel'>('cashflow');
   const [filter, setFilter] = useState('all');
   const [periodFilter, setPeriodFilter] = useState<'month' | 'quarter' | 'year' | 'all'>('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [goalRevenue, setGoalRevenue] = useState(() => {
+    try { return parseFloat(localStorage.getItem('nghub_finance_goal') || '0') || 0; } catch { return 0; }
+  });
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allDataList, setAllDataList] = useState<{ amount: number; type: string; category: string; date: string; status: string; due_date?: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,8 +121,8 @@ const Finance: React.FC = () => {
   const location = useLocation();
 
   useEffect(() => { fetchAllData(); fetchSettings(); }, []);
-  useEffect(() => { setCurrentPage(1); }, [filter, periodFilter]);
-  useEffect(() => { fetchPaginatedTransactions(); }, [currentPage, filter, periodFilter]);
+  useEffect(() => { setCurrentPage(1); }, [filter, periodFilter, categoryFilter, dateFrom, dateTo]);
+  useEffect(() => { fetchPaginatedTransactions(); }, [currentPage, filter, periodFilter, categoryFilter, dateFrom, dateTo]);
   useEffect(() => {
     if (location.state?.openModal) { setIsAddOpen(true); window.history.replaceState({}, document.title); }
   }, [location]);
@@ -147,7 +156,12 @@ const Finance: React.FC = () => {
       setIsListLoading(true);
       let query = supabase.from('transactions').select('*', { count: 'exact' });
       if (filter !== 'all') query = query.eq('type', filter);
-      if (periodFilter !== 'all') {
+      if (categoryFilter !== 'all') query = query.eq('category', categoryFilter);
+      if (dateFrom) query = query.gte('date', new Date(dateFrom).toISOString());
+      if (dateTo) {
+        const end = new Date(dateTo); end.setHours(23, 59, 59, 999);
+        query = query.lte('date', end.toISOString());
+      } else if (periodFilter !== 'all') {
         const now = new Date();
         const start = new Date();
         if (periodFilter === 'month') start.setDate(1);
@@ -388,13 +402,41 @@ const Finance: React.FC = () => {
             {(['month', 'quarter', 'year', 'all'] as const).map(p => {
               const labels = { month: 'Mês', quarter: 'Trimestre', year: 'Ano', all: 'Tudo' };
               return (
-                <button key={p} onClick={() => setPeriodFilter(p)}
-                  className={`text-[10px] uppercase font-bold tracking-wider px-3 py-1.5 rounded-md transition-all duration-200 ${periodFilter === p ? 'bg-brand-border text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                <button key={p} onClick={() => { setPeriodFilter(p); setDateFrom(''); setDateTo(''); }}
+                  className={`text-[10px] uppercase font-bold tracking-wider px-3 py-1.5 rounded-md transition-all duration-200 ${periodFilter === p && !dateFrom ? 'bg-brand-border text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}>
                   {labels[p]}
                 </button>
               );
             })}
           </div>
+
+          {/* Category filter */}
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            className="bg-zinc-900 border border-brand-border rounded-lg px-3 py-1.5 text-[11px] font-bold text-zinc-400 focus:outline-none focus:border-brand-gold/50"
+          >
+            <option value="all">Todas categorias</option>
+            {Array.from(new Set(allDataList.map(t => t.category))).sort().map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+
+          {/* Date range */}
+          <div className="flex items-center gap-1.5 bg-zinc-900 border border-brand-border rounded-lg px-2 py-1">
+            <Filter className="w-3 h-3 text-zinc-600" />
+            <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPeriodFilter('all'); }}
+              className="bg-transparent text-[10px] text-zinc-400 focus:outline-none w-28" placeholder="De" />
+            <span className="text-zinc-700 text-xs">→</span>
+            <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPeriodFilter('all'); }}
+              className="bg-transparent text-[10px] text-zinc-400 focus:outline-none w-28" placeholder="Até" />
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="text-zinc-600 hover:text-red-400 ml-1">
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
           <Button variant="ghost" onClick={exportCSV} icon={Download}>CSV</Button>
           <Button variant="ghost" onClick={openSettings} icon={Settings}>Config.</Button>
           <Button variant="primary" onClick={() => setIsAddOpen(true)} icon={Plus}>Nova Transação</Button>
@@ -408,6 +450,9 @@ const Finance: React.FC = () => {
         </button>
         <button onClick={() => setViewMode('dre')} className={`pb-3 text-sm font-medium flex items-center gap-2 transition-colors ${viewMode === 'dre' ? 'text-brand-gold border-b-2 border-brand-gold' : 'text-zinc-500 hover:text-white'}`}>
           <FileText className="w-4 h-4" /> DRE Contábil
+        </button>
+        <button onClick={() => setViewMode('intel')} className={`pb-3 text-sm font-medium flex items-center gap-2 transition-colors ${viewMode === 'intel' ? 'text-brand-gold border-b-2 border-brand-gold' : 'text-zinc-500 hover:text-white'}`}>
+          <Brain className="w-4 h-4" /> Inteligência
         </button>
       </div>
 
@@ -652,7 +697,202 @@ const Finance: React.FC = () => {
         </div>
       )}
 
+      {/* ═══════════════════════ INTEL VIEW ═══════════════════════ */}
+      {viewMode === 'intel' && (() => {
+        // --- MoM Growth (last 6 months) ---
+        const momData: { month: string; Receita: number; growth: number | null }[] = [];
+        const now2 = new Date();
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now2.getFullYear(), now2.getMonth() - i, 1);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          const val = allDataList.filter(t => t.type === 'income' && t.date.startsWith(key)).reduce((a, t) => a + Number(t.amount), 0);
+          const prevKey = `${new Date(d.getFullYear(), d.getMonth() - 1, 1).getFullYear()}-${String(new Date(d.getFullYear(), d.getMonth() - 1, 1).getMonth() + 1).padStart(2, '0')}`;
+          const prevVal = allDataList.filter(t => t.type === 'income' && t.date.startsWith(prevKey)).reduce((a, t) => a + Number(t.amount), 0);
+          const growth = prevVal === 0 ? null : ((val - prevVal) / prevVal) * 100;
+          momData.push({ month: d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }), Receita: val, growth });
+        }
+
+        // --- Top 5 categories (income) ---
+        const catMap: Record<string, number> = {};
+        allDataList.filter(t => t.type === 'income').forEach(t => { catMap[t.category] = (catMap[t.category] || 0) + Number(t.amount); });
+        const topCats = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const catTotal = topCats.reduce((a, [, v]) => a + v, 0);
+
+        // --- Projection (avg of last 3 months → next 3) ---
+        const last3Months: number[] = [];
+        for (let i = 3; i >= 1; i--) {
+          const d2 = new Date(now2.getFullYear(), now2.getMonth() - i, 1);
+          const key2 = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}`;
+          const val2 = allDataList.filter(t => t.type === 'income' && t.date.startsWith(key2)).reduce((a, t) => a + Number(t.amount), 0);
+          last3Months.push(val2);
+        }
+        const avgIncome = last3Months.reduce((a, v) => a + v, 0) / 3;
+        const projData = [
+          ...last3Months.map((v, i) => ({ month: new Date(now2.getFullYear(), now2.getMonth() - 3 + i, 1).toLocaleDateString('pt-BR', { month: 'short' }), Realizado: v, Projeção: null })),
+          ...Array.from({ length: 3 }, (_, i) => ({ month: new Date(now2.getFullYear(), now2.getMonth() + i + 1, 1).toLocaleDateString('pt-BR', { month: 'short' }), Realizado: null, Projeção: Math.round(avgIncome * (1 + i * 0.03)) })),
+        ];
+
+        // --- Goal progress ---
+        const currentMonthIncome = allDataList.filter(t => {
+          const key3 = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
+          return t.type === 'income' && t.date.startsWith(key3);
+        }).reduce((a, t) => a + Number(t.amount), 0);
+        const goalPct = goalRevenue > 0 ? Math.min((currentMonthIncome / goalRevenue) * 100, 100) : 0;
+
+        // --- Produto vs Evento breakdown ---
+        const prodIncome = allDataList.filter(t => t.type === 'income' && t.category === 'Produto CRM').reduce((a, t) => a + Number(t.amount), 0);
+        const eventIncome = allDataList.filter(t => t.type === 'income' && t.category === 'CRM').reduce((a, t) => a + Number(t.amount), 0);
+        const otherIncome = incomeTotal - prodIncome - eventIncome;
+
+        return (
+          <div className="space-y-6">
+            {/* Row 1: Goal + MoM growth */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {/* Meta de Receita */}
+              <div className="bg-brand-surface border border-brand-border rounded-xl p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Target className="w-4 h-4 text-brand-gold" />
+                    <span className="text-sm font-bold text-zinc-300">Meta do Mês</span>
+                  </div>
+                  <button onClick={() => { setEditingGoal(true); setGoalInput(goalRevenue.toString()); }}
+                    className="text-[10px] text-zinc-500 hover:text-brand-gold transition-colors">
+                    Editar
+                  </button>
+                </div>
+                {editingGoal ? (
+                  <div className="flex gap-2 items-center mb-3">
+                    <input type="number" value={goalInput} onChange={e => setGoalInput(e.target.value)}
+                      className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white w-full focus:outline-none focus:border-brand-gold/50" placeholder="R$ 50000" />
+                    <button onClick={() => { const g = parseFloat(goalInput) || 0; setGoalRevenue(g); localStorage.setItem('nghub_finance_goal', g.toString()); setEditingGoal(false); }}
+                      className="px-3 py-1.5 bg-brand-gold text-black text-xs font-bold rounded-lg">OK</button>
+                  </div>
+                ) : null}
+                <p className="text-2xl font-serif font-bold text-brand-gold mb-1">R$ {fmt(currentMonthIncome)}</p>
+                {goalRevenue > 0 ? (
+                  <>
+                    <p className="text-xs text-zinc-500 mb-2">de R$ {fmt(goalRevenue)} ({goalPct.toFixed(1)}%)</p>
+                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${goalPct}%`, background: goalPct >= 100 ? '#34d399' : goalPct >= 60 ? '#D4AF37' : '#f87171' }} />
+                    </div>
+                    {goalPct >= 100 && <p className="text-[10px] text-emerald-400 mt-1 font-bold">🎉 Meta atingida!</p>}
+                  </>
+                ) : (
+                  <p className="text-xs text-zinc-600 mt-1 italic">Configure uma meta para o mês</p>
+                )}
+              </div>
+
+              {/* Crescimento MoM */}
+              <div className="lg:col-span-2 bg-brand-surface border border-brand-border rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Zap className="w-4 h-4 text-indigo-400" />
+                  <span className="text-sm font-bold text-zinc-300">Crescimento de Receita — últimos 6 meses</span>
+                </div>
+                <div className="h-[140px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={momData}>
+                      <defs>
+                        <linearGradient id="recGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                      <XAxis dataKey="month" stroke="#71717a" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#71717a" fontSize={10} tickLine={false} axisLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px' }}
+                        formatter={(val: number) => [`R$ ${fmt(val)}`, 'Receita']} />
+                      <Area dataKey="Receita" stroke="#D4AF37" fill="url(#recGrad)" strokeWidth={2} dot={{ r: 3, fill: '#D4AF37' }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex gap-3 mt-3 flex-wrap">
+                  {momData.slice(1).map((m, i) => (
+                    <div key={i} className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${m.growth === null ? 'text-zinc-600' : m.growth >= 0 ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20' : 'text-red-400 bg-red-400/10 border border-red-400/20'}`}>
+                      {m.growth !== null ? (m.growth >= 0 ? '▲' : '▼') : ''} {m.growth !== null ? `${Math.abs(m.growth).toFixed(1)}%` : '-'} <span className="text-zinc-600 font-normal">{m.month}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Top categorias + Breakdown + Projeção */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {/* Top Categorias */}
+              <div className="bg-brand-surface border border-brand-border rounded-xl p-6">
+                <p className="text-sm font-bold text-zinc-300 mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" /> Top 5 Fontes de Receita
+                </p>
+                <div className="space-y-3">
+                  {topCats.length === 0 && <p className="text-xs text-zinc-600 italic">Nenhuma receita registrada.</p>}
+                  {topCats.map(([cat, val], i) => (
+                    <div key={cat}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs text-zinc-300 truncate">{cat}</span>
+                        <span className="text-xs font-mono text-brand-gold ml-2 shrink-0">R$ {fmt(val)}</span>
+                      </div>
+                      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${(val / catTotal) * 100}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Produto vs Evento */}
+              <div className="bg-brand-surface border border-brand-border rounded-xl p-6">
+                <p className="text-sm font-bold text-zinc-300 mb-4">Breakdown CRM</p>
+                <div className="space-y-4">
+                  {[
+                    { label: 'Produto', value: prodIncome, color: '#D4AF37', desc: 'Etiquetas de produto' },
+                    { label: 'Evento', value: eventIncome, color: '#60a5fa', desc: 'Vendas via evento' },
+                    { label: 'Outros', value: otherIncome, color: '#a1a1aa', desc: 'Demais receitas' },
+                  ].map(item => (
+                    <div key={item.label}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold" style={{ color: item.color }}>{item.label}</span>
+                        <span className="text-xs font-mono text-zinc-300">R$ {fmt(item.value)}</span>
+                      </div>
+                      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: incomeTotal > 0 ? `${(item.value / incomeTotal) * 100}%` : '0%', backgroundColor: item.color }} />
+                      </div>
+                      <p className="text-[9px] text-zinc-600 mt-0.5">{item.desc} · {incomeTotal > 0 ? `${((item.value / incomeTotal) * 100).toFixed(1)}%` : '0%'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Projeção */}
+              <div className="bg-brand-surface border border-brand-border rounded-xl p-6">
+                <p className="text-sm font-bold text-zinc-300 mb-1 flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-violet-400" /> Projeção de Caixa
+                </p>
+                <p className="text-[10px] text-zinc-600 mb-3">Extrapolação baseada na média dos últimos 3 meses</p>
+                <div className="h-[160px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={projData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                      <XAxis dataKey="month" stroke="#71717a" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#71717a" fontSize={10} tickLine={false} axisLine={false} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px' }}
+                        formatter={(val: number) => val ? [`R$ ${fmt(val)}`, undefined] : ['-', undefined]} />
+                      <Line dataKey="Realizado" stroke="#D4AF37" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+                      <Line dataKey="Projeção" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="6 3" dot={{ r: 3 }} connectNulls={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <p className="text-[10px] text-zinc-600 mt-2">
+                  <span className="text-violet-400 font-bold">--- Projeção:</span> R$ {fmt(avgIncome)}/mês estimado
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ═══════════════════════ MODAL: Nova Transação ═══════════════════════ */}
+
       <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Nova Transação" footer={
         <><Button variant="ghost" onClick={() => setIsAddOpen(false)}>Cancelar</Button>
           <Button variant="primary" onClick={handleAddTransaction} icon={Plus}>Salvar</Button></>

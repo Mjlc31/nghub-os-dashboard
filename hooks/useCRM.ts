@@ -2,14 +2,27 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Lead, LeadStage, Event, Seller } from '../types';
 
+export interface ProductLabel {
+    id: string;
+    name: string;
+    color: string; // tailwind color key (legacy)
+    hexColor?: string; // custom hex color (new)
+    price?: number; // price in BRL
+}
+
+const PRODUCT_LABELS_KEY = 'nghub_product_labels';
+const STAGES_KEY = 'nghub_crm_stages_v2';
+const PIPELINE_OPTIONS = ['Geral', 'Evento', 'Produto'] as const;
+
 export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: string) => void) => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [events, setEvents] = useState<Event[]>([]);
     const [team, setTeam] = useState<Seller[]>([]);
     const [loading, setLoading] = useState(true);
+    const [productLabels, setProductLabels] = useState<ProductLabel[]>([]);
 
     // Default stage names if not loaded from cache
-    const defaultStageNames = {
+    const defaultStageNames: Record<string, string> = {
         [LeadStage.DRAFT]: 'Rascunhos',
         [LeadStage.NEW_LEAD]: 'Novo Lead',
         [LeadStage.QUALIFIED]: 'Qualificado',
@@ -18,33 +31,64 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         [LeadStage.CHURN]: 'Churn'
     };
 
-    const [stageNames, setStageNames] = useState<Record<string, string>>(defaultStageNames);
+    // Per-pipeline stage names: { Geral: {...}, Evento: {...}, Produto: {...} }
+    const [stageNamesByPipeline, setStageNamesByPipeline] = useState<Record<string, Record<string, string>>>({
+        Geral: { ...defaultStageNames },
+        Evento: { ...defaultStageNames },
+        Produto: { ...defaultStageNames },
+    });
+
+    // Backward-compatible getter
+    const getStageNames = useCallback((pipeline: string): Record<string, string> => {
+        return stageNamesByPipeline[pipeline] || stageNamesByPipeline['Geral'] || defaultStageNames;
+    }, [stageNamesByPipeline]);
 
     useEffect(() => {
         fetchEvents();
         fetchTeam();
         fetchLeads();
         loadStageNames();
+        loadProductLabels();
     }, []);
 
     const loadStageNames = () => {
-        const savedStages = localStorage.getItem('nghub_crm_stages');
-        if (savedStages) {
+        // Try v2 (per-pipeline) first
+        const savedV2 = localStorage.getItem(STAGES_KEY);
+        if (savedV2) {
             try {
-                const parsed = JSON.parse(savedStages);
-                const merged = { ...defaultStageNames, ...parsed };
-                if (!parsed[LeadStage.DRAFT]) merged[LeadStage.DRAFT] = defaultStageNames[LeadStage.DRAFT];
-                setStageNames(merged);
-            } catch (e) {
-                // Fallback to default
-            }
+                const parsed = JSON.parse(savedV2) as Record<string, Record<string, string>>;
+                const merged: Record<string, Record<string, string>> = {};
+                for (const p of PIPELINE_OPTIONS) {
+                    merged[p] = { ...defaultStageNames, ...(parsed[p] || {}) };
+                }
+                setStageNamesByPipeline(merged);
+                return;
+            } catch { /* fallback */ }
+        }
+
+        // Migrate from v1 (single shared stageNames)
+        const savedV1 = localStorage.getItem('nghub_crm_stages');
+        if (savedV1) {
+            try {
+                const parsed = JSON.parse(savedV1);
+                const shared = { ...defaultStageNames, ...parsed };
+                const migrated: Record<string, Record<string, string>> = {};
+                for (const p of PIPELINE_OPTIONS) {
+                    migrated[p] = { ...shared };
+                }
+                setStageNamesByPipeline(migrated);
+                // Save as v2 and remove v1
+                localStorage.setItem(STAGES_KEY, JSON.stringify(migrated));
+                localStorage.removeItem('nghub_crm_stages');
+            } catch { /* fallback */ }
         }
     };
 
-    const saveStageNames = (newNames: Record<string, string>) => {
-        setStageNames(newNames);
-        localStorage.setItem('nghub_crm_stages', JSON.stringify(newNames));
-        onNotify?.('success', 'Nomes das etapas atualizados!');
+    const saveStageNames = (pipeline: string, newNames: Record<string, string>) => {
+        const updated = { ...stageNamesByPipeline, [pipeline]: newNames };
+        setStageNamesByPipeline(updated);
+        localStorage.setItem(STAGES_KEY, JSON.stringify(updated));
+        onNotify?.('success', `Etapas da pipeline "${pipeline}" atualizadas!`);
     };
 
     const fetchTeam = useCallback(async () => {
@@ -79,6 +123,7 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
                 createdAt: l.created_at,
                 notes: l.notes || '',
                 pipeline: l.pipeline || 'Geral',
+                productLabel: l.product_label || '',
             }));
 
             setLeads(mappedLeads);
@@ -102,7 +147,7 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
             fetchLeads(); // Revert on failure
             onNotify?.('error', 'Erro ao atualizar etapa.');
         } else {
-            onNotify?.('success', `Lead movido para ${stageNames[targetStage]}`);
+            onNotify?.('success', `Lead movido para ${getStageNames(lead.pipeline || 'Geral')[targetStage]}`);
 
             // Transaction Logic for WON
             if (targetStage === LeadStage.WON) {
@@ -116,6 +161,129 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         }
     };
 
+    // ── Pipeline Management ─────────────────────────────────────────────
+    const updateLeadPipeline = async (leadId: string, pipeline: string) => {
+        const lead = leads.find(l => l.id === leadId);
+        if (!lead || lead.pipeline === pipeline) return;
+
+        // Clear labels when switching pipeline (optimistic)
+        setLeads(prev => prev.map(l => l.id === leadId
+            ? { ...l, pipeline, tagId: undefined, productLabel: '' }
+            : l
+        ));
+
+        const { error } = await supabase.from('leads')
+            .update({ pipeline, tag_id: null, product_label: null })
+            .eq('id', leadId);
+
+        if (error) {
+            fetchLeads();
+            onNotify?.('error', 'Erro ao mover lead de pipeline.');
+        } else {
+            // Also remove orphaned product transactions for this lead
+            if (lead.name) {
+                await supabase.from('transactions')
+                    .delete()
+                    .like('description', `Produto:%— ${lead.name}`)
+                    .eq('category', 'Produto CRM');
+            }
+            onNotify?.('success', `Lead movido para pipeline ${pipeline} — etiqueta removida`);
+        }
+    };
+
+    const bulkUpdatePipeline = async (leadIds: string[], pipeline: string) => {
+        try {
+            const { error } = await supabase.from('leads')
+                .update({ pipeline, tag_id: null, product_label: null })
+                .in('id', leadIds);
+            if (error) throw error;
+            setLeads(prev => prev.map(l => leadIds.includes(l.id)
+                ? { ...l, pipeline, tagId: undefined, productLabel: '' }
+                : l
+            ));
+            onNotify?.('success', `${leadIds.length} leads movidos para pipeline ${pipeline} — etiquetas removidas`);
+        } catch {
+            onNotify?.('error', 'Erro ao mover leads de pipeline.');
+        }
+    };
+
+    // ── Product Labels ──────────────────────────────────────────────────
+    const loadProductLabels = () => {
+        try {
+            const saved = localStorage.getItem(PRODUCT_LABELS_KEY);
+            if (saved) setProductLabels(JSON.parse(saved));
+        } catch { /* fallback empty */ }
+    };
+
+    const saveProductLabelsToStorage = (labels: ProductLabel[]) => {
+        setProductLabels(labels);
+        localStorage.setItem(PRODUCT_LABELS_KEY, JSON.stringify(labels));
+    };
+
+    const addProductLabel = (name: string, color: string, hexColor?: string, price?: number) => {
+        const newLabel: ProductLabel = {
+            id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
+            name,
+            color,
+            hexColor: hexColor || '#6366f1',
+            price: price || 0,
+        };
+        saveProductLabelsToStorage([...productLabels, newLabel]);
+        onNotify?.('success', `Etiqueta "${name}" criada!`);
+        return newLabel;
+    };
+
+    const updateProductLabel = (labelId: string, updates: Partial<ProductLabel>) => {
+        const updated = productLabels.map(l => l.id === labelId ? { ...l, ...updates } : l);
+        saveProductLabelsToStorage(updated);
+    };
+
+    const deleteProductLabel = (labelId: string) => {
+        saveProductLabelsToStorage(productLabels.filter(l => l.id !== labelId));
+        // Clear productLabel from leads using it
+        setLeads(prev => prev.map(l => l.productLabel === labelId ? { ...l, productLabel: '' } : l));
+        onNotify?.('success', 'Etiqueta removida!');
+    };
+
+    const updateLeadProductLabel = async (leadId: string, labelId: string) => {
+        const lead = leads.find(l => l.id === leadId);
+        try {
+            const { error } = await supabase.from('leads')
+                .update({ product_label: labelId || null })
+                .eq('id', leadId);
+            if (error) throw error;
+
+            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, productLabel: labelId || '' } : l));
+
+            // Finance integration: remove old product transaction, add new one
+            if (lead?.name) {
+                await supabase.from('transactions')
+                    .delete()
+                    .like('description', `Produto:%— ${lead.name}`)
+                    .eq('category', 'Produto CRM');
+            }
+
+            if (labelId) {
+                const label = productLabels.find(l => l.id === labelId);
+                if (label && label.price && label.price > 0 && lead?.name) {
+                    await supabase.from('transactions').insert([{
+                        description: `Produto: ${label.name} — ${lead.name}`,
+                        amount: label.price,
+                        type: 'income',
+                        category: 'Produto CRM',
+                        status: 'paid',
+                        date: new Date().toISOString(),
+                    }]);
+                }
+            }
+
+            onNotify?.('success', labelId ? 'Etiqueta de produto atualizada!' : 'Etiqueta removida');
+        } catch {
+            onNotify?.('error', 'Erro ao atualizar etiqueta de produto.');
+        }
+    };
+
+    // ── Tag (Event) ─────────────────────────────────────────────────────
     const updateLeadTag = async (leadId: string, tagId: string) => {
         try {
             const selectedEvent = events.find(e => e.id === tagId);
@@ -299,13 +467,20 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         events,
         team,
         loading,
-        stageNames,
+        getStageNames,
         saveStageNames,
         updateLeadStage,
+        updateLeadPipeline,
+        bulkUpdatePipeline,
         updateLeadTag,
         updateLeadOwner,
         updateLeadNotes,
         updateLeadValue,
+        productLabels,
+        addProductLabel,
+        updateProductLabel,
+        deleteProductLabel,
+        updateLeadProductLabel,
         addLead,
         bulkAssignLeads,
         addSeller,

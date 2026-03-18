@@ -22,12 +22,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
                 <div className="relative">
                     {icon && (
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-brand-gold transition-colors pointer-events-none flex items-center justify-center">
-                            {typeof icon === 'function' ? (
+                            {React.isValidElement(icon) ? (
+                                React.cloneElement(icon as React.ReactElement, {
+                                    className: `w-4 h-4 ${(icon.props as any).className || ''}`
+                                })
+                            ) : typeof icon === 'function' || (typeof icon === 'object' && icon !== null && (icon as any).render) ? (
                                 <Icon className="w-4 h-4" />
                             ) : (
-                                React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement, {
-                                    className: `w-4 h-4 ${(icon.props as any).className || ''}`
-                                }) : icon
+                                icon as React.ReactNode
                             )}
                         </div>
                     )}

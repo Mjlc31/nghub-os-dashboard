@@ -2,6 +2,7 @@ import React from 'react';
 import { Lead, LeadStage } from '../../types';
 import { LeadCard } from './LeadCard';
 import { Skeleton } from '../ui/Skeleton';
+import { ProductLabel } from '../../hooks/useCRM';
 
 interface KanbanColumnProps {
     stage: LeadStage;
@@ -12,9 +13,9 @@ interface KanbanColumnProps {
     onDrop: (e: React.DragEvent, stage: LeadStage) => void;
     onDragStart: (e: React.DragEvent, id: string) => void;
     onLeadClick: (lead: Lead) => void;
-    // Helper functions passed down for presentation logic
     getTagStyle: (tagId?: string) => { bg: string; border: string; text: string } | null;
     getEventName: (id?: string) => string | undefined;
+    getProductLabelInfo: (labelId?: string) => { name: string; hexColor?: string; price?: number } | null;
     onWhatsAppClick: (phone: string) => void;
     isBulkMode?: boolean;
     selectedLeadIds?: string[];
@@ -33,6 +34,7 @@ const KanbanColumnComponent: React.FC<KanbanColumnProps> = ({
     onWhatsAppClick,
     getTagStyle,
     getEventName,
+    getProductLabelInfo,
     isBulkMode,
     selectedLeadIds,
     onToggleSelect,
@@ -79,20 +81,26 @@ const KanbanColumnComponent: React.FC<KanbanColumnProps> = ({
                         ))}
                     </div>
                 ) : (
-                    leads.map((lead) => (
-                        <LeadCard
-                            key={lead.id}
-                            lead={lead}
-                            colorStyle={getTagStyle(lead.tagId)}
-                            eventName={getEventName(lead.tagId)}
-                            onDragStart={onDragStart}
-                            onClick={onLeadClick}
-                            onWhatsAppClick={onWhatsAppClick}
-                            isBulkMode={isBulkMode}
-                            isSelected={selectedLeadIds?.includes(lead.id)}
-                            onToggleSelect={onToggleSelect}
-                        />
-                    ))
+                    leads.map((lead) => {
+                        const plInfo = getProductLabelInfo(lead.productLabel);
+                        return (
+                            <LeadCard
+                                key={lead.id}
+                                lead={lead}
+                                colorStyle={getTagStyle(lead.tagId)}
+                                eventName={getEventName(lead.tagId)}
+                                productLabelName={plInfo?.name}
+                                productLabelHexColor={plInfo?.hexColor}
+                                productLabelPrice={plInfo?.price}
+                                onDragStart={onDragStart}
+                                onClick={onLeadClick}
+                                onWhatsAppClick={onWhatsAppClick}
+                                isBulkMode={isBulkMode}
+                                isSelected={selectedLeadIds?.includes(lead.id)}
+                                onToggleSelect={onToggleSelect}
+                            />
+                        );
+                    })
                 )}
                 {!loading && leads.length === 0 && (
                     <div className="text-center py-8 opacity-30">
@@ -113,17 +121,16 @@ export const KanbanColumn = React.memo(KanbanColumnComponent, (prev, next) => {
     if (prev.isBulkMode !== next.isBulkMode) return false;
     if (prev.leads.length !== next.leads.length) return false;
 
-    // Deep check: only re-render if any lead in this column changed
     for (let i = 0; i < prev.leads.length; i++) {
         const pl = prev.leads[i];
         const nl = next.leads[i];
         if (pl.id !== nl.id || pl.stage !== nl.stage || pl.value !== nl.value ||
-            pl.tagId !== nl.tagId || pl.ownerId !== nl.ownerId || pl.name !== nl.name) {
+            pl.tagId !== nl.tagId || pl.ownerId !== nl.ownerId || pl.name !== nl.name ||
+            pl.productLabel !== nl.productLabel) {
             return false;
         }
     }
 
-    // Check selected IDs relevant to this column
     const prevSelected = (prev.selectedLeadIds || []).filter(id => prev.leads.some(l => l.id === id));
     const nextSelected = (next.selectedLeadIds || []).filter(id => next.leads.some(l => l.id === id));
     if (prevSelected.length !== nextSelected.length) return false;

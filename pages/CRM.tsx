@@ -5,7 +5,7 @@ import {
   MoreHorizontal, Plus, Search, Filter, Phone, Calendar, ArrowRight,
   Save, MessageCircle, Loader2, UserPlus, Upload, FileSpreadsheet,
   Download, Trash2, Settings, CheckCircle, Mail, ChevronRight, Briefcase, ChevronDown, Tag, Edit2,
-  X, MoveRight, MoveLeft, DollarSign, Circle, MessageSquare
+  X, MoveRight, MoveLeft, DollarSign, Circle, MessageSquare, ArrowRightLeft
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import { supabase } from '../lib/supabase';
@@ -14,7 +14,7 @@ import { KanbanColumn } from '../components/crm/KanbanColumn';
 import { LeadFormModal } from '../components/crm/LeadFormModal';
 import { ImportLeadsModal } from '../components/crm/ImportLeadsModal';
 import { SellersModal } from '../components/crm/SellersModal';
-import { LeadDetailModal } from '../components/crm/LeadDetailModal';
+import { LeadDetailModal, getLabelColor } from '../components/crm/LeadDetailModal';
 import { EditStagesModal } from '../components/crm/EditStagesModal';
 import { useCRM } from '../hooks/useCRM';
 import { Button } from '../components/ui/Button';
@@ -46,13 +46,20 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     events,
     team,
     loading,
-    stageNames,
+    getStageNames,
     saveStageNames,
     updateLeadStage,
+    updateLeadPipeline,
+    bulkUpdatePipeline,
     updateLeadTag,
     updateLeadOwner,
     updateLeadNotes,
     updateLeadValue,
+    productLabels,
+    addProductLabel,
+    updateProductLabel,
+    deleteProductLabel,
+    updateLeadProductLabel,
     addLead,
     bulkAssignLeads,
     addSeller,
@@ -66,6 +73,9 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const [selectedPipeline, setSelectedPipeline] = useState<string>('Geral');
   const [activeMobileStage, setActiveMobileStage] = useState<LeadStage>(LeadStage.DRAFT);
   const [mobileActionLead, setMobileActionLead] = useState<Lead | null>(null);
+
+  // Compute stageNames for current pipeline
+  const stageNames = getStageNames(selectedPipeline);
   const [tempStageNames, setTempStageNames] = useState<Record<string, string>>(stageNames);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -96,12 +106,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     }
   }, [location]);
 
+  // Sync tempStageNames when pipeline changes
   useEffect(() => {
-    setTempStageNames(stageNames);
-  }, [stageNames]);
+    setTempStageNames(getStageNames(selectedPipeline));
+  }, [selectedPipeline, getStageNames]);
 
   const handleSaveStageNames = () => {
-    saveStageNames(tempStageNames);
+    saveStageNames(selectedPipeline, tempStageNames);
     setIsEditStagesModalOpen(false);
   };
 
@@ -113,6 +124,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   }, [events]);
 
   const getEventName = useCallback((id?: string) => events.find(e => e.id === id)?.title, [events]);
+
+  const getProductLabelInfo = useCallback((labelId?: string) => {
+    if (!labelId) return null;
+    const label = productLabels.find(l => l.id === labelId);
+    if (!label) return null;
+    return { name: label.name, hexColor: label.hexColor || '#6366f1', price: label.price || 0 };
+  }, [productLabels]);
 
   const filteredLeads = leads.filter(l => {
     const term = searchTerm.toLowerCase();
@@ -557,6 +575,27 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
               </button>
             </div>
 
+            {/* Mover Pipeline */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 flex items-center gap-1.5"><ArrowRightLeft className="w-3 h-3" /> Mover para Pipeline</p>
+              <div className="flex gap-2">
+                {['Geral', 'Evento', 'Produto'].map(p => (
+                  <button
+                    key={p}
+                    onClick={() => { updateLeadPipeline(mobileActionLead.id, p); setMobileActionLead(null); }}
+                    className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all ${
+                      (mobileActionLead.pipeline || 'Geral') === p
+                        ? 'bg-brand-gold/10 border-brand-gold text-brand-gold'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-500 active:bg-zinc-800'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mover Etapa */}
             <div className="space-y-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Mover para etapa</p>
               {stageKeys.map(stage => (
@@ -568,7 +607,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 active:bg-zinc-800'
                     }`}
                 >
-                  <span>{stageNames[stage]}</span>
+                  <span>{getStageNames(mobileActionLead.pipeline || 'Geral')[stage]}</span>
                   {mobileActionLead.stage === stage && <CheckCircle className="w-4 h-4" />}
                 </button>
               ))}
@@ -619,6 +658,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
                 onWhatsAppClick={openWhatsApp}
                 getTagStyle={getTagStyle}
                 getEventName={getEventName}
+                getProductLabelInfo={getProductLabelInfo}
                 isBulkMode={isBulkMode}
                 selectedLeadIds={selectedLeadIds}
                 onToggleSelect={(id) => {
@@ -655,6 +695,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         tempStageNames={tempStageNames}
         setTempStageNames={setTempStageNames}
         onSave={handleSaveStageNames}
+        pipelineName={selectedPipeline}
       />
 
       <SellersModal
@@ -675,6 +716,12 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         onUpdateOwner={updateLeadOwner}
         onUpdateNotes={updateLeadNotes}
         onUpdateValue={updateLeadValue}
+        onUpdatePipeline={updateLeadPipeline}
+        onUpdateProductLabel={updateLeadProductLabel}
+        productLabels={productLabels}
+        onAddProductLabel={addProductLabel}
+        onUpdateProductLabel_config={updateProductLabel}
+        onDeleteProductLabel={deleteProductLabel}
         onDeleteLead={handleDeleteLead}
       />
 
@@ -708,8 +755,25 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
                 if (e.target.value) handleBulkMoveSubmit(e.target.value as LeadStage);
               }}
               options={[
-                { value: '', label: 'Mover para...' },
+                { value: '', label: 'Mover etapa...' },
                 ...stageKeys.map(k => ({ value: k, label: stageNames[k] }))
+              ]}
+            />
+
+            <Select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  bulkUpdatePipeline(selectedLeadIds, e.target.value);
+                  setIsBulkMode(false);
+                  setSelectedLeadIds([]);
+                }
+              }}
+              options={[
+                { value: '', label: 'Mover pipeline...' },
+                { value: 'Geral', label: 'Pipeline: Geral' },
+                { value: 'Evento', label: 'Pipeline: Evento' },
+                { value: 'Produto', label: 'Pipeline: Produto' }
               ]}
             />
 
