@@ -36,7 +36,15 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState('');
   const { userProfile, loading } = useUserProfile();
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && globalSearch.trim()) {
+      navigate(`/crm?search=${encodeURIComponent(globalSearch.trim())}`);
+      setGlobalSearch('');
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -140,7 +148,11 @@ const Layout: React.FC = () => {
               <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Pesquisar..."
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Buscar lead... (Enter)"
+                title="Pressione Enter para buscar no CRM"
                 className="bg-zinc-900/50 border border-white/10 rounded-full pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-brand-gold/50 focus:bg-zinc-900 transition-all w-64 text-zinc-300 placeholder-zinc-600"
               />
             </div>

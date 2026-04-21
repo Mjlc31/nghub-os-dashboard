@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lead, LeadStage, Event } from '../types';
 import {
   MoreHorizontal, Plus, Search, Filter, Phone, Calendar, ArrowRight,
@@ -39,6 +39,7 @@ const TAG_STYLES = [
 const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -104,7 +105,12 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       setIsAddModalOpen(true);
       window.history.replaceState({}, document.title);
     }
-  }, [location]);
+    // Ponto 4: lê ?search= vindo da busca global do header
+    const urlSearch = searchParams.get('search');
+    if (urlSearch) {
+      setSearchTerm(urlSearch);
+    }
+  }, [location, searchParams]);
 
   // Sync tempStageNames when pipeline changes
   useEffect(() => {

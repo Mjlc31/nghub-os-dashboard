@@ -14,6 +14,16 @@ const PRODUCT_LABELS_KEY = 'nghub_product_labels';
 const STAGES_KEY = 'nghub_crm_stages_v2';
 const PIPELINE_OPTIONS = ['Geral', 'Evento', 'Produto'] as const;
 
+// Movido para fora do hook — objeto estático, nunca muda (Melhoria 6)
+const DEFAULT_STAGE_NAMES: Record<string, string> = {
+    [LeadStage.DRAFT]: 'Rascunhos',
+    [LeadStage.NEW_LEAD]: 'Novo Lead',
+    [LeadStage.QUALIFIED]: 'Qualificado',
+    [LeadStage.NEGOTIATION]: 'Em Negociação',
+    [LeadStage.WON]: 'Venda Fechada',
+    [LeadStage.CHURN]: 'Churn',
+};
+
 export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: string) => void) => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [events, setEvents] = useState<Event[]>([]);
@@ -21,26 +31,16 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
     const [loading, setLoading] = useState(true);
     const [productLabels, setProductLabels] = useState<ProductLabel[]>([]);
 
-    // Default stage names if not loaded from cache
-    const defaultStageNames: Record<string, string> = {
-        [LeadStage.DRAFT]: 'Rascunhos',
-        [LeadStage.NEW_LEAD]: 'Novo Lead',
-        [LeadStage.QUALIFIED]: 'Qualificado',
-        [LeadStage.NEGOTIATION]: 'Em Negociação',
-        [LeadStage.WON]: 'Venda Fechada',
-        [LeadStage.CHURN]: 'Churn'
-    };
-
     // Per-pipeline stage names: { Geral: {...}, Evento: {...}, Produto: {...} }
     const [stageNamesByPipeline, setStageNamesByPipeline] = useState<Record<string, Record<string, string>>>({
-        Geral: { ...defaultStageNames },
-        Evento: { ...defaultStageNames },
-        Produto: { ...defaultStageNames },
+        Geral: { ...DEFAULT_STAGE_NAMES },
+        Evento: { ...DEFAULT_STAGE_NAMES },
+        Produto: { ...DEFAULT_STAGE_NAMES },
     });
 
-    // Backward-compatible getter
+    // Backward-compatible getter — useMemo garante estabilidade de referência
     const getStageNames = useCallback((pipeline: string): Record<string, string> => {
-        return stageNamesByPipeline[pipeline] || stageNamesByPipeline['Geral'] || defaultStageNames;
+        return stageNamesByPipeline[pipeline] || stageNamesByPipeline['Geral'] || DEFAULT_STAGE_NAMES;
     }, [stageNamesByPipeline]);
 
     useEffect(() => {
@@ -59,7 +59,7 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
                 const parsed = JSON.parse(savedV2) as Record<string, Record<string, string>>;
                 const merged: Record<string, Record<string, string>> = {};
                 for (const p of PIPELINE_OPTIONS) {
-                    merged[p] = { ...defaultStageNames, ...(parsed[p] || {}) };
+                    merged[p] = { ...DEFAULT_STAGE_NAMES, ...(parsed[p] || {}) };
                 }
                 setStageNamesByPipeline(merged);
                 return;
@@ -71,13 +71,12 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         if (savedV1) {
             try {
                 const parsed = JSON.parse(savedV1);
-                const shared = { ...defaultStageNames, ...parsed };
+                const shared = { ...DEFAULT_STAGE_NAMES, ...parsed };
                 const migrated: Record<string, Record<string, string>> = {};
                 for (const p of PIPELINE_OPTIONS) {
                     migrated[p] = { ...shared };
                 }
                 setStageNamesByPipeline(migrated);
-                // Save as v2 and remove v1
                 localStorage.setItem(STAGES_KEY, JSON.stringify(migrated));
                 localStorage.removeItem('nghub_crm_stages');
             } catch { /* fallback */ }
@@ -170,22 +169,31 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
                 }
 
                 if (txAmount > 0) {
-                    // Check if exists to avoid duplicates (could be from updateLeadValue when already WON)
+                    // BUG-2 FIX: busca cirúrgica por lead_id em vez de LIKE frágil
                     const { data: existing } = await supabase.from('transactions')
-                        .select('id').like('description', `%${lead.name}`).in('category', ['CRM', 'Produto CRM']).limit(1);
-                        
+                        .select('id')
+                        .eq('lead_id', id)
+                        .in('category', ['CRM', 'Produto CRM'])
+                        .limit(1);
+
                     if (!existing || existing.length === 0) {
-                        await supabase.from('transactions').insert([{ 
-                            description: txDesc, amount: txAmount, type: 'income', 
-                            category: txCategory, date: new Date().toISOString(), status: 'paid' 
+                        await supabase.from('transactions').insert([{
+                            description: txDesc, amount: txAmount, type: 'income',
+                            category: txCategory, date: new Date().toISOString(),
+                            status: 'paid', lead_id: id,
                         }]);
                     } else {
-                        await supabase.from('transactions').update({ amount: txAmount, category: txCategory, description: txDesc }).eq('id', existing[0].id);
+                        await supabase.from('transactions')
+                            .update({ amount: txAmount, category: txCategory, description: txDesc })
+                            .eq('id', existing[0].id);
                     }
                 }
             } else if ((lead.stage as string) === LeadStage.WON) {
-                // Removed from WON
-                await supabase.from('transactions').delete().like('description', `%${lead.name}`).in('category', ['CRM', 'Produto CRM']);
+                // BUG-5 FIX: exclusão por lead_id — sem em-dash, sem LIKE
+                await supabase.from('transactions')
+                    .delete()
+                    .eq('lead_id', id)
+                    .in('category', ['CRM', 'Produto CRM']);
             }
         }
     };
@@ -209,14 +217,12 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
             fetchLeads();
             onNotify?.('error', 'Erro ao mover lead de pipeline.');
         } else {
-            // Also remove orphaned product transactions for this lead
-            if (lead.name) {
-                await supabase.from('transactions')
-                    .delete()
-                    .like('description', `Produto:%— ${lead.name}`)
-                    .eq('category', 'Produto CRM');
-            }
-            onNotify?.('success', `Lead movido para pipeline ${pipeline} — etiqueta removida`);
+            // BUG-5 FIX: exclusão por lead_id — elimina falhas de encoding com em-dash
+            await supabase.from('transactions')
+                .delete()
+                .eq('lead_id', leadId)
+                .eq('category', 'Produto CRM');
+            onNotify?.('success', `Lead movido para pipeline ${pipeline} - etiqueta removida`);
         }
     };
 
@@ -284,25 +290,24 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
 
             setLeads(prev => prev.map(l => l.id === leadId ? { ...l, productLabel: labelId || '' } : l));
 
-            // Finance integration: remove old product transaction, add new one
-            if (lead?.name) {
-                await supabase.from('transactions')
-                    .delete()
-                    .like('description', `Produto:%— ${lead.name}`)
-                    .eq('category', 'Produto CRM');
-            }
+            // BUG-5 FIX: exclusão por lead_id — sem LIKE com em-dash
+            await supabase.from('transactions')
+                .delete()
+                .eq('lead_id', leadId)
+                .eq('category', 'Produto CRM');
 
-            // Finance integration: only sync if WON
+            // Sync nova transação de produto se lead está WON
             if (labelId && lead?.stage === LeadStage.WON) {
                 const label = productLabels.find(l => l.id === labelId);
-                if (label && label.price && label.price > 0 && lead?.name) {
+                if (label && label.price && label.price > 0) {
                     await supabase.from('transactions').insert([{
-                        description: `Produto: ${label.name} — ${lead.name}`,
+                        description: `Produto: ${label.name} - ${lead?.name || ''}`,
                         amount: label.price,
                         type: 'income',
                         category: 'Produto CRM',
                         status: 'paid',
                         date: new Date().toISOString(),
+                        lead_id: leadId,
                     }]);
                 }
             }

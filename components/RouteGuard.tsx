@@ -8,18 +8,27 @@ const RouteGuard = () => {
     const location = useLocation();
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setLoading(false);
+        let active = true;
+
+        // Listener registrado ANTES do getSession para não perder eventos
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (active) setSession(session);
         });
 
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-        });
+        // getSession com finally infalível — loading sempre resolve
+        supabase.auth.getSession()
+            .then(({ data: { session } }) => {
+                if (active) setSession(session);
+            })
+            .catch(() => { /* sessão inválida — redireciona para /login */ })
+            .finally(() => {
+                if (active) setLoading(false);
+            });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            active = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     if (loading) {

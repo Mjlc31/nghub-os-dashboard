@@ -123,15 +123,38 @@ export const useDashboardData = (filters: DashboardFilter = { time: 'all', owner
             // 2. CRM (Leads)
             const totalLeads = leadsList.length;
 
-            // Get Custom Stage Names from LocalStorage or use Default
-            const savedStages = localStorage.getItem('nghub_crm_stages');
-            const stageMap: Record<string, string> = savedStages ? JSON.parse(savedStages) : {
-                [LeadStage.NEW_LEAD]: 'Novo Lead',
-                [LeadStage.QUALIFIED]: 'Qualificado',
-                [LeadStage.NEGOTIATION]: 'Em Negociação',
-                [LeadStage.WON]: 'Venda Fechada',
-                [LeadStage.CHURN]: 'Churn'
-            };
+            // Lê etapas customizadas da chave v2 (consistente com o CRM)
+            const savedStages = localStorage.getItem('nghub_crm_stages_v2');
+            let stageMap: Record<string, string>;
+            if (savedStages) {
+                try {
+                    const parsed = JSON.parse(savedStages) as Record<string, Record<string, string>>;
+                    // Usa pipeline 'Geral' como base para o funil
+                    stageMap = parsed['Geral'] || {
+                        [LeadStage.NEW_LEAD]: 'Novo Lead',
+                        [LeadStage.QUALIFIED]: 'Qualificado',
+                        [LeadStage.NEGOTIATION]: 'Em Negociação',
+                        [LeadStage.WON]: 'Venda Fechada',
+                        [LeadStage.CHURN]: 'Churn'
+                    };
+                } catch {
+                    stageMap = {
+                        [LeadStage.NEW_LEAD]: 'Novo Lead',
+                        [LeadStage.QUALIFIED]: 'Qualificado',
+                        [LeadStage.NEGOTIATION]: 'Em Negociação',
+                        [LeadStage.WON]: 'Venda Fechada',
+                        [LeadStage.CHURN]: 'Churn'
+                    };
+                }
+            } else {
+                stageMap = {
+                    [LeadStage.NEW_LEAD]: 'Novo Lead',
+                    [LeadStage.QUALIFIED]: 'Qualificado',
+                    [LeadStage.NEGOTIATION]: 'Em Negociação',
+                    [LeadStage.WON]: 'Venda Fechada',
+                    [LeadStage.CHURN]: 'Churn'
+                };
+            }
 
             // Calculate conversion
             const wonLeads = leadsList.filter(l => l.stage === LeadStage.WON || l.stage === 'Membro Ativo').length;
