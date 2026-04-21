@@ -12,16 +12,16 @@ import { KPICard } from '../components/dashboard/KPICard';
 import { RevenueChart } from '../components/dashboard/RevenueChart';
 import { SalesFunnel } from '../components/dashboard/SalesFunnel';
 import { RecentActivity } from '../components/dashboard/RecentActivity';
-import { useDashboardData, TimeFilter } from '../hooks/useDashboardData';
+import { useDashboardData, DashboardFilter } from '../hooks/useDashboardData';
 import { Skeleton } from '../components/ui/Skeleton';
 
-interface DashboardProps {
-  onNavigate: (view: string) => void;
-}
-
 const Dashboard: React.FC = () => {
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
-  const { loading, kpis, chartData, funnelData, recentActivity } = useDashboardData(timeFilter);
+  const [filters, setFilters] = useState<DashboardFilter>({
+    time: 'all',
+    ownerId: 'all',
+    pipeline: 'all'
+  });
+  const { loading, kpis, chartData, funnelData, recentActivity, availableOwners, availablePipelines } = useDashboardData(filters);
   const navigate = useNavigate();
 
   const handleNavigate = (path: string, openModal = false) => {
@@ -107,12 +107,36 @@ const Dashboard: React.FC = () => {
           <h1 className="text-3xl md:text-4xl font-serif font-bold text-white tracking-tight mb-1">Visão Geral</h1>
           <p className="text-sm text-zinc-400">Métricas de performance em tempo real.</p>
         </div>
-        <div className="flex items-center gap-1 bg-brand-surface border border-brand-border rounded-lg p-1 text-xs font-medium text-zinc-400 overflow-x-auto no-scrollbar">
-          <button onClick={() => setTimeFilter('today')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === 'today' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>Hoje</button>
-          <button onClick={() => setTimeFilter('7d')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === '7d' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>7 Dias</button>
-          <button onClick={() => setTimeFilter('15d')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === '15d' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>15 Dias</button>
-          <button onClick={() => setTimeFilter('30d')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === '30d' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>30 Dias</button>
-          <button onClick={() => setTimeFilter('all')} className={`px-3 py-1.5 rounded-md shadow-sm transition-colors whitespace-nowrap ${timeFilter === 'all' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>Todos</button>
+        <div className="flex flex-wrap items-center gap-3">
+          {availableOwners && availableOwners.length > 0 && (
+            <select
+                className="bg-brand-surface border border-brand-border text-white text-sm rounded-lg focus:ring-brand-gold focus:border-brand-gold block w-40 p-2 outline-none h-[42px]"
+                value={filters.ownerId}
+                onChange={(e) => setFilters(prev => ({ ...prev, ownerId: e.target.value }))}
+            >
+                <option value="all">Todos os Vendedores</option>
+                {availableOwners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+          )}
+
+          {availablePipelines && availablePipelines.length > 0 && (
+            <select
+                className="bg-brand-surface border border-brand-border text-white text-sm rounded-lg focus:ring-brand-gold focus:border-brand-gold block w-40 p-2 outline-none h-[42px]"
+                value={filters.pipeline}
+                onChange={(e) => setFilters(prev => ({ ...prev, pipeline: e.target.value }))}
+            >
+                <option value="all">Todos os Funis</option>
+                {availablePipelines.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          )}
+
+          <div className="flex items-center gap-1 bg-brand-surface border border-brand-border rounded-lg p-1 text-xs font-medium text-zinc-400 overflow-x-auto no-scrollbar h-[42px]">
+            <button onClick={() => setFilters(f => ({...f, time: 'today'}))} className={`px-3 py-1.5 h-full rounded-md shadow-sm transition-colors whitespace-nowrap ${filters.time === 'today' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>Hoje</button>
+            <button onClick={() => setFilters(f => ({...f, time: '7d'}))} className={`px-3 py-1.5 h-full rounded-md shadow-sm transition-colors whitespace-nowrap ${filters.time === '7d' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>7 Dias</button>
+            <button onClick={() => setFilters(f => ({...f, time: '15d'}))} className={`px-3 py-1.5 h-full rounded-md shadow-sm transition-colors whitespace-nowrap ${filters.time === '15d' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>15 Dias</button>
+            <button onClick={() => setFilters(f => ({...f, time: '30d'}))} className={`px-3 py-1.5 h-full rounded-md shadow-sm transition-colors whitespace-nowrap ${filters.time === '30d' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>30 Dias</button>
+            <button onClick={() => setFilters(f => ({...f, time: 'all'}))} className={`px-3 py-1.5 h-full rounded-md shadow-sm transition-colors whitespace-nowrap ${filters.time === 'all' ? 'bg-brand-gold/10 border border-brand-gold/30 text-brand-gold' : 'hover:bg-zinc-800 hover:text-white'}`}>Todos</button>
+          </div>
         </div>
       </div>
 

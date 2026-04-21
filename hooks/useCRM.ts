@@ -122,6 +122,7 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
                 owner: l.owner ? { id: l.owner_id, name: l.owner.name, phone: l.owner.phone } : undefined,
                 createdAt: l.created_at,
                 notes: l.notes || '',
+                form_answers: l.form_answers,
                 pipeline: l.pipeline || 'Geral',
                 productLabel: l.product_label || '',
             }));
@@ -151,12 +152,40 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
 
             // Transaction Logic for WON
             if (targetStage === LeadStage.WON) {
-                const eventPrice = lead.tagId ? (events.find(e => e.id === lead.tagId)?.price || lead.value) : lead.value;
-                if (eventPrice > 0) {
-                    await supabase.from('transactions').insert([{ description: `Venda: ${lead.name}`, amount: eventPrice, type: 'income', category: 'CRM', date: new Date().toISOString() }]);
+                // Determine price and category
+                let txAmount = lead.value;
+                let txCategory = 'CRM';
+                let txDesc = `Venda: ${lead.name}`;
+
+                if (lead.pipeline === 'Produto' && lead.productLabel) {
+                    const labelObj = productLabels.find(l => l.id === lead.productLabel);
+                    if (labelObj?.price) {
+                        txAmount = labelObj.price;
+                        txCategory = 'Produto CRM';
+                        txDesc = `Produto: ${labelObj.name} — ${lead.name}`;
+                    }
+                } else if (lead.tagId) {
+                    const eventObj = events.find(e => e.id === lead.tagId);
+                    if (eventObj?.price) txAmount = eventObj.price;
+                }
+
+                if (txAmount > 0) {
+                    // Check if exists to avoid duplicates (could be from updateLeadValue when already WON)
+                    const { data: existing } = await supabase.from('transactions')
+                        .select('id').like('description', `%${lead.name}`).in('category', ['CRM', 'Produto CRM']).limit(1);
+                        
+                    if (!existing || existing.length === 0) {
+                        await supabase.from('transactions').insert([{ 
+                            description: txDesc, amount: txAmount, type: 'income', 
+                            category: txCategory, date: new Date().toISOString(), status: 'paid' 
+                        }]);
+                    } else {
+                        await supabase.from('transactions').update({ amount: txAmount, category: txCategory, description: txDesc }).eq('id', existing[0].id);
+                    }
                 }
             } else if ((lead.stage as string) === LeadStage.WON) {
-                await supabase.from('transactions').delete().eq('description', `Venda: ${lead.name}`).eq('category', 'CRM');
+                // Removed from WON
+                await supabase.from('transactions').delete().like('description', `%${lead.name}`).in('category', ['CRM', 'Produto CRM']);
             }
         }
     };
@@ -173,7 +202,7 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         ));
 
         const { error } = await supabase.from('leads')
-            .update({ pipeline, tag_id: null, product_label: null })
+            .update({ pipeline, tag_id: null }) // Do not update product_label to null blindly to avoid schema errors if missing, handled safely
             .eq('id', leadId);
 
         if (error) {
@@ -263,7 +292,8 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
                     .eq('category', 'Produto CRM');
             }
 
-            if (labelId) {
+            // Finance integration: only sync if WON
+            if (labelId && lead?.stage === LeadStage.WON) {
                 const label = productLabels.find(l => l.id === labelId);
                 if (label && label.price && label.price > 0 && lead?.name) {
                     await supabase.from('transactions').insert([{
@@ -345,8 +375,8 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
             if (currentLead?.stage === LeadStage.WON && currentLead.name) {
                 const { data: existingTx } = await supabase.from('transactions')
                     .select('id')
-                    .eq('description', `Venda: ${currentLead.name}`)
-                    .eq('category', 'CRM')
+                    .like('description', `%${currentLead.name}`)
+                    .in('category', ['CRM', 'Produto CRM'])
                     .limit(1);
 
                 if (existingTx && existingTx.length > 0) {
@@ -360,7 +390,8 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
                         description: `Venda: ${currentLead.name}`, 
                         amount: value, 
                         type: 'income', 
-                        category: 'CRM', 
+                        category: currentLead.pipeline === 'Produto' ? 'Produto CRM' : 'CRM', 
+                        status: 'paid',
                         date: new Date().toISOString() 
                     }]);
                 }

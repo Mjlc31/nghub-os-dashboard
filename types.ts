@@ -48,6 +48,7 @@ export interface Lead {
   notes?: string;
   pipeline?: string;
   productLabel?: string;
+  form_answers?: Record<string, any>;
 }
 
 export interface Event {

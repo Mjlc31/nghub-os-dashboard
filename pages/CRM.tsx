@@ -191,9 +191,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   };
 
   const handleBulkMoveSubmit = async (targetStage: LeadStage) => {
-    for (const id of selectedLeadIds) {
-      await updateLeadStage(id, targetStage);
-    }
+    await Promise.all(selectedLeadIds.map(id => updateLeadStage(id, targetStage)));
     setIsBulkMode(false);
     setSelectedLeadIds([]);
     onNotify('success', `${selectedLeadIds.length} leads movidos!`);

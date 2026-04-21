@@ -75,6 +75,14 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     const notesDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const priceDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // Cleanup debounce timers on unmount to avoid memory leaks / stale updates
+    useEffect(() => {
+        return () => {
+            if (notesDebounceTimer.current) clearTimeout(notesDebounceTimer.current);
+            if (priceDebounceTimer.current) clearTimeout(priceDebounceTimer.current);
+        };
+    }, []);
+
     const currentPipeline = selectedLead?.pipeline || 'Geral';
 
     useEffect(() => {
@@ -179,6 +187,23 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                                 <Mail className="w-3.5 h-3.5 text-zinc-600" />{selectedLead.email}
                             </p>
                         )}
+                    </div>
+                )}
+
+                {/* FORM ANSWERS */}
+                {selectedLead.form_answers && Object.keys(selectedLead.form_answers).length > 0 && (
+                    <div className="flex flex-col gap-2 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800/80 mt-2">
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1 flex items-center gap-1.5 border-b border-zinc-800 pb-2">
+                            <FileText className="w-3.5 h-3.5" /> Respostas do Formulário
+                        </p>
+                        <div className="space-y-3 pt-1">
+                            {Object.entries(selectedLead.form_answers).map(([question, answer]) => (
+                                <div key={question}>
+                                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">{question}</p>
+                                    <p className="text-sm text-zinc-300 bg-zinc-950 p-2 rounded-md border border-zinc-800/50 whitespace-pre-wrap">{String(answer)}</p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
 

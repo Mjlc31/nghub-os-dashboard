@@ -144,10 +144,15 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
    };
 
    const handleSaveEvent = async () => {
-      if (!newEvent.title || !newEvent.date) return;
+      if (!newEvent.title || !newEvent.date) {
+         onNotify('error', 'Preencha os campos obrigatórios (Título e Data).');
+         return;
+      }
 
       try {
-         const eventData = {
+         const { data: { user } } = await supabase.auth.getUser();
+         
+         const eventData: any = {
             title: newEvent.title,
             date: newEvent.date,
             location: newEvent.location,
@@ -163,6 +168,9 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
             onNotify('success', 'Evento atualizado com sucesso!');
          } else {
             // Create new event
+            if (user?.id) {
+               eventData.user_id = user.id;
+            }
             const { error } = await supabase.from('events').insert([{
                ...eventData,
                attendees_count: 0,

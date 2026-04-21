@@ -5,6 +5,7 @@ interface UserProfile {
     name: string;
     email: string;
     avatar?: string;
+    role: string;
 }
 
 export const useUserProfile = () => {
@@ -23,7 +24,8 @@ export const useUserProfile = () => {
                 setUserProfile({
                     email: user.email || '',
                     name: user.user_metadata?.full_name || 'Usuário',
-                    avatar: user.user_metadata?.avatar_url
+                    avatar: user.user_metadata?.avatar_url,
+                    role: user.user_metadata?.role || 'admin'
                 });
             }
         } catch (error) {

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CheckCircle, AlertCircle, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -29,6 +29,7 @@ const Toast: React.FC<ToastProps> = ({ toasts, removeToast }) => {
         >
           {toast.type === 'success' && <div className="p-1 bg-brand-gold/10 rounded-full"><CheckCircle className="w-5 h-5 text-brand-gold" /></div>}
           {toast.type === 'error' && <div className="p-1 bg-red-500/10 rounded-full"><AlertCircle className="w-5 h-5 text-red-400" /></div>}
+          {toast.type === 'info' && <div className="p-1 bg-blue-500/10 rounded-full"><Info className="w-5 h-5 text-blue-400" /></div>}
           <span className="text-sm font-medium flex-1 tracking-wide">{toast.message}</span>
           <button onClick={() => removeToast(toast.id)} className="text-zinc-500 hover:text-white transition-colors">
             <X className="w-4 h-4" />

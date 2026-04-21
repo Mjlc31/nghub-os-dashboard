@@ -141,9 +141,13 @@ const LeadCardComponent: React.FC<LeadCardProps> = ({
                 </p>
             </div>
 
-            {/* Score bar — thin micro progress */}
-            <div className="pl-2 mt-2">
-                <div className="h-0.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+            {/* Score bar — progress */}
+            <div className="pl-2 mt-2 group/score relative">
+                <div className="flex justify-between items-center mb-1 opacity-0 group-hover/score:opacity-100 transition-opacity absolute -top-5 left-2 right-0 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-[9px] text-zinc-400 z-10 shadow-lg">
+                    <span>Lead Score (Perfil Completo)</span>
+                    <span className={scoreColor}>{score}%</span>
+                </div>
+                <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden cursor-help" title={`Score de completude do lead: ${score}%`}>
                     <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{ width: `${score}%`, backgroundColor: scoreBarColor }}

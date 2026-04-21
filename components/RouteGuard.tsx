@@ -34,6 +34,19 @@ const RouteGuard = () => {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
+    const role = session.user?.user_metadata?.role || 'admin';
+    const isAcademy = location.pathname.startsWith('/academy');
+
+    // Restrict PASS students to Academy only
+    if (role === 'pass_student' && !isAcademy) {
+        return <Navigate to="/academy" replace />;
+    }
+
+    // Restrict sellers from accessing Academy
+    if (role === 'seller' && isAcademy) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
     return <Outlet />;
 };
 

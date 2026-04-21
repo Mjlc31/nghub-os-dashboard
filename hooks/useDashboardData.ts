@@ -14,11 +14,12 @@ export interface ActivityItem {
 }
 
 // interface TransactionRow deleted - using Transaction from types.ts
-interface LeadRow { stage: string; name: string; created_at: string; }
+interface LeadRow { stage: string; name: string; created_at: string; owner?: any; pipeline?: string; value?: number; tag?: any; }
 interface UpcomingEventRow { date: string; title: string; }
 export type TimeFilter = 'today' | '7d' | '15d' | '30d' | 'all';
+export interface DashboardFilter { time: TimeFilter; ownerId: string; pipeline: string; }
 
-export const useDashboardData = (timeFilter: TimeFilter = 'all') => {
+export const useDashboardData = (filters: DashboardFilter = { time: 'all', ownerId: 'all', pipeline: 'all' }) => {
     const [loading, setLoading] = useState(true);
     const [kpis, setKpis] = useState({
         revenue: 0,
@@ -33,8 +34,11 @@ export const useDashboardData = (timeFilter: TimeFilter = 'all') => {
     const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
     const [funnelData, setFunnelData] = useState<FunnelDataPoint[]>([]);
     const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+    const [availableOwners, setAvailableOwners] = useState<{id: string; name: string}[]>([]);
+    const [availablePipelines, setAvailablePipelines] = useState<string[]>([]);
 
     const fetchDashboardData = useCallback(async () => {
+        setLoading(true);
         try {
             const [
                 { data: trans },
@@ -44,7 +48,7 @@ export const useDashboardData = (timeFilter: TimeFilter = 'all') => {
                 resSettings
             ] = await Promise.all([
                 supabase.from('transactions').select('*').order('date', { ascending: true }),
-                supabase.from('leads').select('*, tag:events(price, title)'),
+                supabase.from('leads').select('*, tag:events(price, title), owner:sellers(id, name)'),
                 supabase.from('events').select('id, price, title'),
                 supabase.from('events').select('*').eq('status', 'upcoming').order('date', { ascending: true }).limit(1),
                 supabase.from('finance_settings').select('*').limit(1).single()
@@ -58,20 +62,32 @@ export const useDashboardData = (timeFilter: TimeFilter = 'all') => {
             // Filtro de tempo local
             const now = new Date();
             const filterDate = new Date();
-            if (timeFilter === 'today') filterDate.setHours(0, 0, 0, 0);
-            else if (timeFilter === '7d') filterDate.setDate(now.getDate() - 7);
-            else if (timeFilter === '15d') filterDate.setDate(now.getDate() - 15);
-            else if (timeFilter === '30d') filterDate.setDate(now.getDate() - 30);
+            if (filters.time === 'today') filterDate.setHours(0, 0, 0, 0);
+            else if (filters.time === '7d') filterDate.setDate(now.getDate() - 7);
+            else if (filters.time === '15d') filterDate.setDate(now.getDate() - 15);
+            else if (filters.time === '30d') filterDate.setDate(now.getDate() - 30);
 
             const transactionsList: Transaction[] = trans || [];
-            const filteredTransactions = timeFilter === 'all'
+            const filteredTransactions = filters.time === 'all'
                 ? transactionsList
                 : transactionsList.filter(t => new Date(t.date) >= filterDate);
 
-            const allLeads = leads || [];
-            const leadsList = timeFilter === 'all'
-                ? allLeads
-                : allLeads.filter(l => new Date(l.created_at) >= filterDate);
+            const allLeads = (leads as any[]) || [];
+            
+            // Extrair opções de filtros
+            const ownersMap = new Map();
+            const pipelinesSet = new Set<string>();
+            allLeads.forEach(l => {
+                if (l.owner && l.owner.id) ownersMap.set(l.owner.id, l.owner.name);
+                if (l.pipeline) pipelinesSet.add(l.pipeline);
+            });
+            
+            const leadsList = allLeads.filter(l => {
+                const passTime = filters.time === 'all' || new Date(l.created_at) >= filterDate;
+                const passOwner = filters.ownerId === 'all' || l.owner?.id === filters.ownerId;
+                const passPipeline = filters.pipeline === 'all' || l.pipeline === filters.pipeline;
+                return passTime && passOwner && passPipeline;
+            });
 
             // 1. Financeiro (Transactions & Receita)
             // Lógica: Somar todos os leads em Venda Fechada + Entradas não-CRM (para evitar duplicidade)
@@ -171,17 +187,19 @@ export const useDashboardData = (timeFilter: TimeFilter = 'all') => {
             setChartData(chart);
             setFunnelData(funnel);
             setRecentActivity(activity);
+            setAvailableOwners(Array.from(ownersMap.entries()).map(([id, name]) => ({id, name})));
+            setAvailablePipelines(Array.from(pipelinesSet));
 
         } catch (err) {
             console.error('Error fetching dashboard data:', err);
         } finally {
             setLoading(false);
         }
-    }, [timeFilter]);
+    }, [filters]);
 
     useEffect(() => {
         fetchDashboardData();
-    }, [timeFilter, fetchDashboardData]);
+    }, [fetchDashboardData]);
 
-    return { loading, kpis, chartData, funnelData, recentActivity };
+    return { loading, kpis, chartData, funnelData, recentActivity, availableOwners, availablePipelines };
 };

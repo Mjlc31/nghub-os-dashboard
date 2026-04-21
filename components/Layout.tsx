@@ -43,6 +43,13 @@ const Layout: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
+  const userRole = userProfile?.role || 'admin';
+  const filteredNavItems = NAV_ITEMS.filter(item => {
+    if (userRole === 'pass_student') return item.path === '/academy';
+    if (userRole === 'seller') return item.path !== '/academy';
+    return true; // admin sees all
+  });
+
 
 
   return (
@@ -77,7 +84,7 @@ const Layout: React.FC = () => {
         {/* Navigation */}
         <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
           <p className="px-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-4">Menu Principal</p>
-          {NAV_ITEMS.map((item) => (
+          {filteredNavItems.map((item) => (
             <SidebarItem
               key={item.path}
               item={item}
