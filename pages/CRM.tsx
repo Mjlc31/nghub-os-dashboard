@@ -65,7 +65,8 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     bulkAssignLeads,
     addSeller,
     deleteSeller,
-    refreshLeads
+    refreshLeads,
+    updateLeadSourceTags,
   } = useCRM(onNotify);
 
   // UI State
@@ -78,6 +79,12 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   // Compute stageNames for current pipeline
   const stageNames = getStageNames(selectedPipeline);
   const [tempStageNames, setTempStageNames] = useState<Record<string, string>>(stageNames);
+
+  // Dynamic pipeline list: fixed + one per event
+  const availablePipelines = React.useMemo(() => {
+    const eventPipelines = events.map(e => e.title);
+    return ['Geral', 'Produto', ...eventPipelines];
+  }, [events]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -330,9 +337,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
                 setNewLeadForm(prev => ({ ...prev, pipeline: e.target.value }));
               }}
               options={[
-                { value: 'Geral', label: 'Pipeline: Geral' },
-                { value: 'Evento', label: 'Pipeline: Evento' },
-                { value: 'Produto', label: 'Pipeline: Produto' }
+                ...availablePipelines.map(p => ({ value: p, label: `Pipeline: ${p}` }))
               ]}
               icon={<Briefcase className="w-4 h-4" />}
             />
@@ -690,6 +695,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         events={events}
         team={team}
         isSubmitting={isSubmitting}
+        availablePipelines={availablePipelines}
       />
 
       <EditStagesModal
@@ -722,11 +728,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
         onUpdateValue={updateLeadValue}
         onUpdatePipeline={updateLeadPipeline}
         onUpdateProductLabel={updateLeadProductLabel}
+        onUpdateSourceTags={updateLeadSourceTags}
         productLabels={productLabels}
         onAddProductLabel={addProductLabel}
         onUpdateProductLabel_config={updateProductLabel}
         onDeleteProductLabel={deleteProductLabel}
         onDeleteLead={handleDeleteLead}
+        availablePipelines={availablePipelines}
       />
 
       {/* FLOATING BULK ACTION BAR */}
@@ -775,9 +783,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
               }}
               options={[
                 { value: '', label: 'Mover pipeline...' },
-                { value: 'Geral', label: 'Pipeline: Geral' },
-                { value: 'Evento', label: 'Pipeline: Evento' },
-                { value: 'Produto', label: 'Pipeline: Produto' }
+                ...availablePipelines.map(p => ({ value: p, label: `Pipeline: ${p}` }))
               ]}
             />
 

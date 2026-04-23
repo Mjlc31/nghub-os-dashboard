@@ -124,6 +124,7 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
                 form_answers: l.form_answers,
                 pipeline: l.pipeline || 'Geral',
                 productLabel: l.product_label || '',
+                source_tags: Array.isArray(l.source_tags) ? l.source_tags : [],
             }));
 
             setLeads(mappedLeads);
@@ -498,6 +499,19 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         }
     };
 
+    // ── Source Tags (Origem do Lead) ────────────────────────────────────
+    const updateLeadSourceTags = async (leadId: string, tags: string[]) => {
+        try {
+            const { error } = await supabase.from('leads')
+                .update({ source_tags: tags })
+                .eq('id', leadId);
+            if (error) throw error;
+            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, source_tags: tags } : l));
+        } catch {
+            onNotify?.('error', 'Erro ao atualizar etiquetas de origem.');
+        }
+    };
+
     return {
         leads, setLeads,
         events,
@@ -521,6 +535,7 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         bulkAssignLeads,
         addSeller,
         deleteSeller,
-        refreshLeads: fetchLeads
+        refreshLeads: fetchLeads,
+        updateLeadSourceTags,
     };
 };

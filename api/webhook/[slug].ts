@@ -33,19 +33,52 @@ export default async function handler(req: any, res: any) {
 
         try {
             if (config.target_module === 'crm') {
-                // Mapeamento básico para Leads (ajustar conforme o provedor)
+                // Campos básicos de identidade
+                const name = payload.name || payload.full_name || payload.customer?.name || 'Lead via Webhook';
+                const email = payload.email || payload.customer?.email;
+                const phone = payload.phone || payload.whatsapp || payload.customer?.phone;
+
+                // Campos extras do formulário NG.RITMO (e outros)
+                const sector = payload.sector || payload.market || payload.segmento || payload.area;
+                const revenue_text = payload.revenue_text || payload.faturamento || payload.revenue;
+                const headcount = payload.headcount || payload.team_size || payload.equipe;
+                const pain_point = payload.pain_point || payload.bottleneck || payload.dor || payload.problema;
+                const instagram = payload.instagram || payload.instagram_handle || payload.ig;
+
+                // Armazena TODAS as respostas brutas do formulário no campo form_answers
+                // Remove campos já mapeados para evitar duplicidade, mas mantém o restante
+                const knownFields = ['name', 'full_name', 'email', 'phone', 'whatsapp', 'customer'];
+                const formAnswers: Record<string, any> = {};
+                for (const [key, value] of Object.entries(payload)) {
+                    if (!knownFields.includes(key) && value !== null && value !== undefined && value !== '') {
+                        formAnswers[key] = value;
+                    }
+                }
+
                 const leadData = {
-                    name: payload.name || payload.full_name || payload.customer?.name || 'Lead via Webhook',
-                    email: payload.email || payload.customer?.email,
-                    phone: payload.phone || payload.whatsapp || payload.customer?.phone,
+                    name,
+                    email,
+                    phone,
+                    sector,
+                    revenue_text,
+                    headcount,
+                    pain_point,
+                    instagram,
                     origin: config.provider,
                     stage: 'Novo Lead',
-                    owner_id: config.owner_id,
-                    notes: `Dados originais: ${JSON.stringify(payload)}`
+                    pipeline: config.default_pipeline || 'Geral',
+                    owner_id: config.owner_id || null,
+                    form_answers: Object.keys(formAnswers).length > 0 ? formAnswers : null,
                 };
+
+                // Remove campos undefined para não quebrar o insert
+                Object.keys(leadData).forEach(k => {
+                    if ((leadData as any)[k] === undefined) delete (leadData as any)[k];
+                });
 
                 const { error: insertError } = await supabase.from('leads').insert(leadData);
                 if (insertError) throw insertError;
+
             }
             else if (config.target_module === 'finance') {
                 // Mapeamento básico para Transações

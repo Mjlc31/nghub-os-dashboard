@@ -28,6 +28,7 @@ interface LeadFormModalProps {
     events: Event[];
     team: { id: string; name: string }[];
     isSubmitting?: boolean;
+    availablePipelines?: string[];
 }
 
 export const LeadFormModal: React.FC<LeadFormModalProps> = ({
@@ -39,6 +40,7 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
     events,
     team,
     isSubmitting = false,
+    availablePipelines = ['Geral', 'Produto'],
 }) => {
     const [errors, setErrors] = useState<{ name?: string }>({});
 
@@ -146,9 +148,9 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
                             onChange={(e) => setFormData({ ...formData, pipeline: e.target.value })}
                             className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-zinc-200 focus:border-brand-gold focus:outline-none focus:ring-1 focus:ring-brand-gold/20 text-sm appearance-none shadow-inner transition-all hover:border-zinc-700"
                         >
-                            <option value="Geral">Geral</option>
-                            <option value="Evento">Evento</option>
-                            <option value="Produto">Produto</option>
+                            {availablePipelines.map(p => (
+                                <option key={p} value={p}>{p}</option>
+                            ))}
                         </select>
                         <ChevronDown className="w-4 h-4 text-zinc-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>

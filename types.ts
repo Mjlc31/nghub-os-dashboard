@@ -49,6 +49,7 @@ export interface Lead {
   pipeline?: string;
   productLabel?: string;
   form_answers?: Record<string, any>;
+  source_tags?: string[];
 }
 
 export interface Event {

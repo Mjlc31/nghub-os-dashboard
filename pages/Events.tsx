@@ -168,9 +168,6 @@ const Events: React.FC<EventsProps> = ({ onNotify }) => {
             onNotify('success', 'Evento atualizado com sucesso!');
          } else {
             // Create new event
-            if (user?.id) {
-               eventData.user_id = user.id;
-            }
             const { error } = await supabase.from('events').insert([{
                ...eventData,
                attendees_count: 0,

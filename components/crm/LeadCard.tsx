@@ -62,6 +62,10 @@ const LeadCardComponent: React.FC<LeadCardProps> = ({
         ? new Date(lead.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
         : '';
 
+    const formattedTime = lead.createdAt
+        ? new Date(lead.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        : '';
+
     const score = getLeadScore(lead);
     const daysInStage = daysSince(lead.createdAt);
     const isStale = daysInStage !== null && daysInStage > 7;
@@ -130,6 +134,12 @@ const LeadCardComponent: React.FC<LeadCardProps> = ({
                 </h4>
                 <p className="text-zinc-500 text-xs mt-0.5 shrink-0 truncate flex items-center gap-1.5">
                     {lead.company || 'Sem empresa'}
+                    {formattedTime && (
+                        <>
+                            <span className="text-zinc-700">•</span>
+                            <span>{formattedTime}</span>
+                        </>
+                    )}
                     {lead.owner && (
                         <>
                             <span className="text-zinc-700">•</span>
