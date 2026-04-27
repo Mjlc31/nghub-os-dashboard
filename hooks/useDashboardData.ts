@@ -51,7 +51,7 @@ export const useDashboardData = (filters: DashboardFilter = { time: 'all', owner
                 supabase.from('leads').select('*, tag:events(price, title), owner:sellers(id, name)'),
                 supabase.from('events').select('id, price, title'),
                 supabase.from('events').select('*').eq('status', 'upcoming').order('date', { ascending: true }).limit(1),
-                supabase.from('finance_settings').select('*').limit(1).single()
+                supabase.from('finance_settings').select('*').limit(1).maybeSingle()
             ]);
 
             const settings: FinanceSettings | null = (resSettings as any)?.data;

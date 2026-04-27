@@ -131,7 +131,7 @@ const Finance: React.FC = () => {
 
   const fetchSettings = async () => {
     try {
-      const { data } = await supabase.from('finance_settings').select('*').limit(1).single();
+      const { data } = await supabase.from('finance_settings').select('*').limit(1).maybeSingle();
       if (data) {
         setSettings({
           ...data,

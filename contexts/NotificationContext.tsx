@@ -24,6 +24,7 @@ const NotificationContext = createContext<NotificationContextData>({} as Notific
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isAvailable, setIsAvailable] = useState(true);
 
     useEffect(() => {
         fetchNotifications();
@@ -34,7 +35,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, payload => {
                 const newNotif = payload.new as Notification;
                 setNotifications(prev => [newNotif, ...prev]);
-                // Also play a sound or show a toast if needed
             })
             .subscribe();
 
@@ -55,41 +55,39 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 .order('created_at', { ascending: false })
                 .limit(20);
 
-            if (error) throw error;
+            // Tabela pode não existir em instâncias sem migração — falha silenciosa
+            if (error) {
+                if ((error as any).code === '42P01' || error.message?.includes('does not exist')) {
+                    setIsAvailable(false);
+                }
+                return;
+            }
             setNotifications(data || []);
         } catch (error) {
-            console.error('Error fetching notifications:', error);
+            console.warn('Notifications table unavailable:', error);
         } finally {
             setLoading(false);
         }
     };
 
     const addNotification = async (title: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+        if (!isAvailable) return;
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return; // Or handle anonymous notifications
+            if (!user) return;
 
-            const { data, error } = await supabase
+            await supabase
                 .from('notifications')
-                .insert([{
-                    user_id: user.id,
-                    title,
-                    message,
-                    type,
-                    read: false
-                }])
+                .insert([{ user_id: user.id, title, message, type, read: false }])
                 .select()
                 .single();
-
-            if (error) throw error;
-            // Realtime subscription will handle adding it to state, but we can do it optimistically too:
-            // setNotifications(prev => [data, ...prev]); 
         } catch (error) {
-            console.error('Error adding notification:', error);
+            console.warn('Error adding notification:', error);
         }
     };
 
     const markAsRead = async (id: string) => {
+        if (!isAvailable) return;
         try {
             const { error } = await supabase
                 .from('notifications')
@@ -99,11 +97,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             if (error) throw error;
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
         } catch (error) {
-            console.error('Error marking notification as read:', error);
+            console.warn('Error marking notification as read:', error);
         }
     };
 
     const markAllAsRead = async () => {
+        if (!isAvailable) return;
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
@@ -112,12 +111,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 .from('notifications')
                 .update({ read: true })
                 .eq('user_id', user.id)
-                .eq('read', false); // Only update unread ones
+                .eq('read', false);
 
             if (error) throw error;
             setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         } catch (error) {
-            console.error('Error marking all notifications as read:', error);
+            console.warn('Error marking all notifications as read:', error);
         }
     };
 
