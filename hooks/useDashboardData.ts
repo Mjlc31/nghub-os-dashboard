@@ -222,6 +222,17 @@ export const useDashboardData = (filters: DashboardFilter = { time: 'all', owner
 
     useEffect(() => {
         fetchDashboardData();
+
+        // Realtime subscriptions para manter o dashboard atualizado
+        const channel = supabase
+            .channel('public:dashboard_data')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => fetchDashboardData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => fetchDashboardData())
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [fetchDashboardData]);
 
     return { loading, kpis, chartData, funnelData, recentActivity, availableOwners, availablePipelines };

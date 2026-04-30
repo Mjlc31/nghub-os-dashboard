@@ -49,7 +49,19 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         fetchLeads();
         loadStageNames();
         loadProductLabels();
-    }, []);
+
+        // Realtime subscription para leads (Atualização automática sem refresh)
+        const channel = supabase
+            .channel('public:leads')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
+                fetchLeads();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [fetchEvents, fetchTeam, fetchLeads]);
 
     const loadStageNames = () => {
         // Try v2 (per-pipeline) first
