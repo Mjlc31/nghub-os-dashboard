@@ -263,22 +263,74 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                         </div>
                     )}
 
-                    {/* FORM ANSWERS */}
-                    {selectedLead.form_answers && Object.keys(selectedLead.form_answers).length > 0 && (
-                        <div className="flex flex-col gap-2 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800/80 mt-2">
-                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1 flex items-center gap-1.5 border-b border-zinc-800/50 pb-2">
-                                <FileText className="w-3.5 h-3.5" /> Respostas do Formulário
+                    {/* LEAD PROFILE — campos estruturados do formulário */}
+                    {(selectedLead.instagram || selectedLead.revenue_text || selectedLead.headcount || selectedLead.pain_point || selectedLead.origin) && (
+                        <div className="flex flex-col gap-0 bg-zinc-900/40 rounded-xl border border-zinc-800/80 overflow-hidden">
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/60">
+                                <FileText className="w-3.5 h-3.5" /> Perfil do Lead
                             </p>
-                            <div className="space-y-3 pt-1">
-                                {Object.entries(selectedLead.form_answers).map(([question, answer]) => (
-                                    <div key={question}>
-                                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1">{question}</p>
-                                        <p className="text-sm text-zinc-300 bg-zinc-950/50 p-2.5 rounded-lg border border-zinc-800/30 whitespace-pre-wrap">{String(answer)}</p>
+                            <div className="divide-y divide-zinc-800/40">
+                                {selectedLead.origin && (
+                                    <div className="flex items-start justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors">
+                                        <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider shrink-0 w-28">📌 Origem</span>
+                                        <span className="text-sm text-zinc-300 text-right">{selectedLead.origin}</span>
                                     </div>
-                                ))}
+                                )}
+                                {selectedLead.instagram && (
+                                    <div className="flex items-start justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors">
+                                        <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider shrink-0 w-28">📸 Instagram</span>
+                                        <a
+                                            href={`https://instagram.com/${selectedLead.instagram.replace('@', '')}`}
+                                            target="_blank" rel="noreferrer"
+                                            className="text-sm text-pink-400 hover:text-pink-300 transition-colors text-right"
+                                        >
+                                            {selectedLead.instagram}
+                                        </a>
+                                    </div>
+                                )}
+                                {selectedLead.revenue_text && (
+                                    <div className="flex items-start justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors">
+                                        <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider shrink-0 w-28">💰 Faturamento</span>
+                                        <span className="text-sm text-emerald-400 font-semibold text-right">{selectedLead.revenue_text}</span>
+                                    </div>
+                                )}
+                                {selectedLead.headcount && (
+                                    <div className="flex items-start justify-between px-4 py-2.5 hover:bg-zinc-800/20 transition-colors">
+                                        <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider shrink-0 w-28">👥 Time</span>
+                                        <span className="text-sm text-zinc-300 text-right">{selectedLead.headcount}</span>
+                                    </div>
+                                )}
+                                {selectedLead.pain_point && (
+                                    <div className="flex items-start gap-4 px-4 py-2.5 hover:bg-zinc-800/20 transition-colors">
+                                        <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider shrink-0 w-28">🎯 Principal Dor</span>
+                                        <span className="text-sm text-zinc-300 leading-relaxed">{selectedLead.pain_point}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
+
+                    {/* FORM ANSWERS — respostas brutas do formulário */}
+                    {selectedLead.form_answers && Object.keys(selectedLead.form_answers).length > 0 && (
+                        <div className="flex flex-col gap-0 bg-zinc-900/40 rounded-xl border border-zinc-800/80 overflow-hidden">
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 px-4 py-2.5 border-b border-zinc-800/50 bg-zinc-900/60">
+                                <FileText className="w-3.5 h-3.5" /> Respostas do Formulário
+                            </p>
+                            <div className="divide-y divide-zinc-800/40">
+                                {Object.entries(selectedLead.form_answers)
+                                    .filter(([, v]) => v !== null && v !== '' && v !== undefined)
+                                    .map(([question, answer]) => (
+                                        <div key={question} className="flex items-start gap-4 px-4 py-2.5 hover:bg-zinc-800/20 transition-colors">
+                                            <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider shrink-0 w-28 capitalize leading-relaxed">
+                                                {question.replace(/_/g, ' ')}
+                                            </span>
+                                            <span className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{String(answer)}</span>
+                                        </div>
+                                    ))}
+                            </div>
+                        </div>
+                    )}
+
 
                     {/* PIPELINE SELECTOR */}
                     <div className="pt-4 border-t border-zinc-800/50">
