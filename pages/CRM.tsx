@@ -67,6 +67,9 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     deleteSeller,
     refreshLeads,
     updateLeadSourceTags,
+    getCustomStageKeys,
+    addCustomStage,
+    removeCustomStage,
   } = useCRM(onNotify);
 
   // UI State
@@ -79,6 +82,14 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   // Compute stageNames for current pipeline
   const stageNames = getStageNames(selectedPipeline);
   const [tempStageNames, setTempStageNames] = useState<Record<string, string>>(stageNames);
+
+  // Custom stage keys for the current pipeline
+  const customStageKeys = getCustomStageKeys(selectedPipeline);
+
+  // All stage keys = fixed enum + custom keys for this pipeline
+  const allStageKeys = React.useMemo(() => {
+    return [...Object.values(LeadStage), ...customStageKeys];
+  }, [customStageKeys]);
 
   // Dynamic pipeline list: fixed + one per event
   const availablePipelines = React.useMemo(() => {
@@ -122,7 +133,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
   // Sync tempStageNames when pipeline changes
   useEffect(() => {
     setTempStageNames(getStageNames(selectedPipeline));
-  }, [selectedPipeline, getStageNames]);
+  }, [selectedPipeline, getStageNames, customStageKeys]);
 
   const handleSaveStageNames = () => {
     saveStageNames(selectedPipeline, tempStageNames);
@@ -162,13 +173,13 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     e.dataTransfer.setData('leadId', id);
   }, []);
 
-  const handleDrop = async (e: React.DragEvent, targetStage: LeadStage) => {
+  const handleDrop = async (e: React.DragEvent, targetStage: string) => {
     e.preventDefault();
     const id = e.dataTransfer.getData('leadId');
     if (isBulkMode && selectedLeadIds.includes(id)) {
       await handleBulkMoveSubmit(targetStage);
     } else {
-      await updateLeadStage(id, targetStage);
+      await updateLeadStage(id, targetStage as LeadStage);
     }
   };
 
@@ -203,8 +214,8 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
     setBulkOwnerId('');
   };
 
-  const handleBulkMoveSubmit = async (targetStage: LeadStage) => {
-    await Promise.all(selectedLeadIds.map(id => updateLeadStage(id, targetStage)));
+  const handleBulkMoveSubmit = async (targetStage: string) => {
+    await Promise.all(selectedLeadIds.map(id => updateLeadStage(id, targetStage as LeadStage)));
     setIsBulkMode(false);
     setSelectedLeadIds([]);
     onNotify('success', `${selectedLeadIds.length} leads movidos!`);
@@ -407,7 +418,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       {/* MOBILE: Sticky Stage Selector (Pill Tabs) */}
       <div className="md:hidden sticky top-20 z-40 bg-brand-darker/95 backdrop-blur-md py-2 border-b border-zinc-800/50 -mx-4 px-4 mb-4">
         <div className="flex overflow-x-auto gap-2 no-scrollbar scroll-smooth snap-x">
-          {stageKeys.map((stage) => {
+          {allStageKeys.map((stage) => {
             const isActive = activeMobileStage === stage;
             const stageLeads = leads.filter(l => l.stage === stage);
             const stageValue = stageLeads.reduce((acc, curr) => {
@@ -646,7 +657,7 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       {/* DESKTOP: Kanban Board (Hidden on Mobile) */}
       <div className="hidden md:flex flex-1 overflow-x-auto pb-4">
         <div className="flex gap-4 min-w-[1200px] h-full">
-          {stageKeys.map((stage) => {
+          {allStageKeys.map((stage) => {
             const stageLeads = filteredLeads.filter(l => l.stage === stage);
             const totalValue = stageLeads.reduce((acc, l) => {
               const eventPrice = l.tagId ? events.find(e => e.id === l.tagId)?.price : undefined;
@@ -701,11 +712,14 @@ const CRM: React.FC<CRMProps> = ({ onNotify }) => {
       <EditStagesModal
         isOpen={isEditStagesModalOpen}
         onClose={() => setIsEditStagesModalOpen(false)}
-        stageKeys={stageKeys}
+        stageKeys={allStageKeys}
         tempStageNames={tempStageNames}
         setTempStageNames={setTempStageNames}
         onSave={handleSaveStageNames}
         pipelineName={selectedPipeline}
+        customStageKeys={customStageKeys}
+        onAddCustomStage={(key, name) => addCustomStage(selectedPipeline, key, name)}
+        onRemoveCustomStage={(key) => removeCustomStage(selectedPipeline, key)}
       />
 
       <SellersModal

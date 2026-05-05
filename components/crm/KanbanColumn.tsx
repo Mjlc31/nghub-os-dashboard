@@ -1,16 +1,16 @@
 import React from 'react';
-import { Lead, LeadStage } from '../../types';
+import { Lead } from '../../types';
 import { LeadCard } from './LeadCard';
 import { Skeleton } from '../ui/Skeleton';
-import { ProductLabel } from '../../hooks/useCRM';
+
 
 interface KanbanColumnProps {
-    stage: LeadStage;
+    stage: string; // aceita LeadStage ou custom stage key
     title: string;
     leads: Lead[];
     totalValue: number;
     loading: boolean;
-    onDrop: (e: React.DragEvent, stage: LeadStage) => void;
+    onDrop: (e: React.DragEvent, stage: string) => void;
     onDragStart: (e: React.DragEvent, id: string) => void;
     onLeadClick: (lead: Lead) => void;
     getTagStyle: (tagId?: string) => { bg: string; border: string; text: string } | null;

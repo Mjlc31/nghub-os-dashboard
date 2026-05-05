@@ -14,6 +14,27 @@ const QUICK_COLORS = [
     '#D4AF37', '#a78bfa', '#fb923c', '#34d399', '#38bdf8',
 ];
 
+// Prefixo especial para diferenciar etiquetas customizadas no source_tags
+const CUSTOM_TAGS_KEY = 'nghub_crm_custom_tags';
+const CUSTOM_TAG_PREFIX = 'ctag:';
+
+interface CustomTag {
+    id: string;
+    name: string;
+    color: string;
+}
+
+const getStoredCustomTags = (): CustomTag[] => {
+    try {
+        const saved = localStorage.getItem(CUSTOM_TAGS_KEY);
+        return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+};
+
+const saveCustomTags = (tags: CustomTag[]) => {
+    localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(tags));
+};
+
 export interface NoteEntry {
     id: string;
     text: string;
@@ -107,6 +128,12 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     const [newSourceTag, setNewSourceTag] = useState('');
     const [showNewSourceTag, setShowNewSourceTag] = useState(false);
 
+    // Custom event tags (multi-select chips)
+    const [customTags, setCustomTags] = useState<CustomTag[]>(getStoredCustomTags());
+    const [showNewCustomTag, setShowNewCustomTag] = useState(false);
+    const [newCustomTagName, setNewCustomTagName] = useState('');
+    const [newCustomTagColor, setNewCustomTagColor] = useState('#6366f1');
+
     const priceDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Cleanup debounce timers on unmount to avoid memory leaks / stale updates
@@ -125,6 +152,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             setNewLabelName('');
             setNewLabelPrice('');
             setEditingLabelId(null);
+            setShowNewCustomTag(false);
+            setNewCustomTagName('');
             
             if (selectedLead.notes) {
                 try {
@@ -209,6 +238,63 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         setShowNewLabel(false);
         setNewLabelName('');
         setNewLabelPrice('');
+    };
+
+    // — Custom tag (multi-select for Geral/Evento pipelines) ——
+    const handleToggleCustomTag = (tagId: string) => {
+        // tagId can be event id or `ctag:${custom.id}`
+        const current = selectedLead.source_tags || [];
+        const tagKey = `${CUSTOM_TAG_PREFIX}${tagId}`;
+        const isActive = current.includes(tagKey);
+        const next = isActive ? current.filter(t => t !== tagKey) : [...current, tagKey];
+        onUpdateSourceTags(selectedLead.id, next);
+    };
+
+    const handleToggleEventTag = (eventId: string) => {
+        const tagKey = `${CUSTOM_TAG_PREFIX}ev:${eventId}`;
+        const current = selectedLead.source_tags || [];
+        const isActive = current.includes(tagKey);
+        const next = isActive ? current.filter(t => t !== tagKey) : [...current, tagKey];
+        // Also update legacy tagId to the first selected event (for backward compat)
+        if (!isActive) {
+            onUpdateTag(selectedLead.id, eventId);
+        } else {
+            // If removing the primary tagId, check if other events are selected
+            const otherEventTags = next
+                .filter(t => t.startsWith(`${CUSTOM_TAG_PREFIX}ev:`))
+                .map(t => t.replace(`${CUSTOM_TAG_PREFIX}ev:`, ''));
+            onUpdateTag(selectedLead.id, otherEventTags[0] || '');
+        }
+        onUpdateSourceTags(selectedLead.id, next);
+    };
+
+    const handleCreateCustomTag = () => {
+        const trimmed = newCustomTagName.trim();
+        if (!trimmed) return;
+        const newTag: CustomTag = {
+            id: `ct_${Date.now()}`,
+            name: trimmed,
+            color: newCustomTagColor,
+        };
+        const updated = [...customTags, newTag];
+        setCustomTags(updated);
+        saveCustomTags(updated);
+        // Auto-apply to lead
+        const tagKey = `${CUSTOM_TAG_PREFIX}${newTag.id}`;
+        const current = selectedLead.source_tags || [];
+        onUpdateSourceTags(selectedLead.id, [...current, tagKey]);
+        setNewCustomTagName('');
+        setShowNewCustomTag(false);
+    };
+
+    const isEventTagActive = (eventId: string) => {
+        const tagKey = `${CUSTOM_TAG_PREFIX}ev:${eventId}`;
+        return (selectedLead.source_tags || []).includes(tagKey) || selectedLead.tagId === eventId;
+    };
+
+    const isCustomTagActive = (tagId: string) => {
+        const tagKey = `${CUSTOM_TAG_PREFIX}${tagId}`;
+        return (selectedLead.source_tags || []).includes(tagKey);
     };
 
     const activeLabelObj = productLabels.find(l => l.id === selectedLead.productLabel);
@@ -486,17 +572,132 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                                 )}
                             </div>
                         ) : (
-                            // EVENT TAGS (Geral and Evento pipelines)
-                            <div className="grid grid-cols-2 gap-4">
-                                <Select
-                                    label="Etiqueta (Evento)"
-                                    value={selectedLead.tagId || ''}
-                                    onChange={(e) => onUpdateTag(selectedLead.id, e.target.value)}
-                                    options={[
-                                        { value: '', label: 'Sem etiqueta' },
-                                        ...events.map(ev => ({ value: ev.id, label: ev.title }))
-                                    ]}
-                                />
+                            // EVENT TAGS (Geral and Evento pipelines) — multi-select chips
+                            <div className="space-y-4">
+                                {/* Multi-select tag chips */}
+                                <div>
+                                    <label className="text-[11px] font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-1.5 mb-3">
+                                        <Tag className="w-3.5 h-3.5" /> Etiquetas do Lead
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {/* Event-based tags */}
+                                        {events.map(ev => {
+                                            const active = isEventTagActive(ev.id);
+                                            return (
+                                                <button
+                                                    key={ev.id}
+                                                    onClick={() => handleToggleEventTag(ev.id)}
+                                                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1.5 ${
+                                                        active
+                                                            ? 'bg-brand-gold/15 border-brand-gold/60 text-brand-gold shadow-sm'
+                                                            : 'bg-zinc-900/50 border-zinc-800/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+                                                    }`}
+                                                >
+                                                    {ev.title}
+                                                    {active && <Check className="w-3 h-3" />}
+                                                </button>
+                                            );
+                                        })}
+
+                                        {/* Custom tags (user-created) */}
+                                        {customTags.map(ct => {
+                                            const active = isCustomTagActive(ct.id);
+                                            return (
+                                                <button
+                                                    key={ct.id}
+                                                    onClick={() => handleToggleCustomTag(ct.id)}
+                                                    style={active ? { backgroundColor: `${ct.color}18`, borderColor: `${ct.color}60`, color: ct.color } : {}}
+                                                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1.5 ${
+                                                        active
+                                                            ? 'ring-1 ring-offset-1 ring-offset-zinc-950 shadow-sm'
+                                                            : 'bg-zinc-900/50 border-zinc-800/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+                                                    }`}
+                                                >
+                                                    {ct.name}
+                                                    {active && <Check className="w-3 h-3" />}
+                                                </button>
+                                            );
+                                        })}
+
+                                        {/* Botão + para criar nova etiqueta */}
+                                        {showNewCustomTag ? (
+                                            <div className="flex items-center gap-2 w-full mt-1 p-3 bg-zinc-900/80 border border-zinc-800 rounded-xl">
+                                                <div className="flex-1 space-y-2">
+                                                    <input
+                                                        autoFocus
+                                                        type="text"
+                                                        value={newCustomTagName}
+                                                        onChange={e => setNewCustomTagName(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter') handleCreateCustomTag();
+                                                            if (e.key === 'Escape') { setShowNewCustomTag(false); setNewCustomTagName(''); }
+                                                        }}
+                                                        placeholder="Nome da etiqueta..."
+                                                        className="w-full bg-zinc-950/80 border border-zinc-700 rounded-lg py-1.5 px-3 text-xs text-white focus:outline-none focus:border-brand-gold/50"
+                                                    />
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] text-zinc-600 flex items-center gap-1"><Palette className="w-3 h-3" /> Cor:</span>
+                                                        <input
+                                                            type="color"
+                                                            value={newCustomTagColor}
+                                                            onChange={e => setNewCustomTagColor(e.target.value)}
+                                                            className="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+                                                        />
+                                                        <div className="flex gap-1">
+                                                            {QUICK_COLORS.slice(0, 8).map(c => (
+                                                                <button
+                                                                    key={c}
+                                                                    onClick={() => setNewCustomTagColor(c)}
+                                                                    className={`w-4 h-4 rounded-full transition-transform hover:scale-110 ${newCustomTagColor === c ? 'ring-1 ring-white ring-offset-1 ring-offset-zinc-900 scale-110' : ''}`}
+                                                                    style={{ backgroundColor: c }}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-1.5">
+                                                    <Button variant="primary" size="sm" onClick={handleCreateCustomTag} disabled={!newCustomTagName.trim()}>
+                                                        <Check className="w-3.5 h-3.5" />
+                                                    </Button>
+                                                    <button onClick={() => { setShowNewCustomTag(false); setNewCustomTagName(''); }} className="p-1.5 text-zinc-600 hover:text-zinc-400">
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowNewCustomTag(true)}
+                                                className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-dashed border-zinc-700/50 text-zinc-500 hover:border-brand-gold/50 hover:text-brand-gold transition-all flex items-center gap-1"
+                                            >
+                                                <Plus className="w-3 h-3" /> Nova
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Active tags preview */}
+                                    {((selectedLead.source_tags || []).filter(t => t.startsWith(CUSTOM_TAG_PREFIX)).length > 0 ||
+                                        selectedLead.tagId) && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-zinc-800/40">
+                                            <span className="text-[9px] text-zinc-600 uppercase tracking-widest mr-1">Ativas:</span>
+                                            {events.filter(ev => isEventTagActive(ev.id)).map(ev => (
+                                                <span key={ev.id} className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-brand-gold/10 border border-brand-gold/30 text-brand-gold">
+                                                    {ev.title}
+                                                </span>
+                                            ))}
+                                            {customTags.filter(ct => isCustomTagActive(ct.id)).map(ct => (
+                                                <span
+                                                    key={ct.id}
+                                                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-md border"
+                                                    style={{ backgroundColor: `${ct.color}18`, borderColor: `${ct.color}50`, color: ct.color }}
+                                                >
+                                                    {ct.name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Valor */}
                                 <div className="space-y-1">
                                     <label className="text-[11px] font-bold uppercase tracking-widest text-zinc-500">Valor (R$)</label>
                                     <div className="relative">

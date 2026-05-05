@@ -12,6 +12,7 @@ export interface ProductLabel {
 
 const PRODUCT_LABELS_KEY = 'nghub_product_labels';
 const STAGES_KEY = 'nghub_crm_stages_v2';
+const CUSTOM_STAGES_KEY = 'nghub_custom_stages_v1';
 const PIPELINE_OPTIONS = ['Geral', 'Evento', 'Produto'] as const;
 
 // Movido para fora do hook — objeto estático, nunca muda (Melhoria 6)
@@ -38,30 +39,14 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         Produto: { ...DEFAULT_STAGE_NAMES },
     });
 
+    // Custom stage keys per pipeline: { Geral: ['custom_key1', ...], ... }
+    const [customStagesByPipeline, setCustomStagesByPipeline] = useState<Record<string, string[]>>({});
+
     // Backward-compatible getter — useMemo garante estabilidade de referência
     const getStageNames = useCallback((pipeline: string): Record<string, string> => {
         return stageNamesByPipeline[pipeline] || stageNamesByPipeline['Geral'] || DEFAULT_STAGE_NAMES;
     }, [stageNamesByPipeline]);
 
-    useEffect(() => {
-        fetchEvents();
-        fetchTeam();
-        fetchLeads();
-        loadStageNames();
-        loadProductLabels();
-
-        // Realtime subscription para leads (Atualização automática sem refresh)
-        const channel = supabase
-            .channel('public:leads')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
-                fetchLeads();
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [fetchEvents, fetchTeam, fetchLeads]);
 
     const loadStageNames = () => {
         // Try v2 (per-pipeline) first
@@ -70,8 +55,14 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
             try {
                 const parsed = JSON.parse(savedV2) as Record<string, Record<string, string>>;
                 const merged: Record<string, Record<string, string>> = {};
-                for (const p of PIPELINE_OPTIONS) {
+                // Merge all known pipelines (including event-based ones stored as keys)
+                const allPipelines = Object.keys(parsed).length > 0 ? Object.keys(parsed) : [...PIPELINE_OPTIONS];
+                for (const p of allPipelines) {
                     merged[p] = { ...DEFAULT_STAGE_NAMES, ...(parsed[p] || {}) };
+                }
+                // Ensure fixed pipelines always exist
+                for (const p of PIPELINE_OPTIONS) {
+                    if (!merged[p]) merged[p] = { ...DEFAULT_STAGE_NAMES };
                 }
                 setStageNamesByPipeline(merged);
                 return;
@@ -94,6 +85,58 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
             } catch { /* fallback */ }
         }
     };
+
+    const loadCustomStages = () => {
+        try {
+            const saved = localStorage.getItem(CUSTOM_STAGES_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved) as Record<string, string[]>;
+                setCustomStagesByPipeline(parsed);
+            }
+        } catch { /* fallback empty */ }
+    };
+
+    const getCustomStageKeys = useCallback((pipeline: string): string[] => {
+        return customStagesByPipeline[pipeline] || [];
+    }, [customStagesByPipeline]);
+
+    const addCustomStage = useCallback((pipeline: string, stageKey: string, stageName: string) => {
+        // Add to custom keys for this pipeline
+        const updatedCustom: Record<string, string[]> = {
+            ...customStagesByPipeline,
+            [pipeline]: [...(customStagesByPipeline[pipeline] || []), stageKey],
+        };
+        setCustomStagesByPipeline(updatedCustom);
+        localStorage.setItem(CUSTOM_STAGES_KEY, JSON.stringify(updatedCustom));
+
+        // Add display name to stageNames for this pipeline
+        const updatedNames = {
+            ...stageNamesByPipeline,
+            [pipeline]: { ...(stageNamesByPipeline[pipeline] || DEFAULT_STAGE_NAMES), [stageKey]: stageName },
+        };
+        setStageNamesByPipeline(updatedNames);
+        localStorage.setItem(STAGES_KEY, JSON.stringify(updatedNames));
+
+        onNotify?.('success', `Coluna "${stageName}" adicionada ao pipeline ${pipeline}!`);
+    }, [customStagesByPipeline, stageNamesByPipeline, onNotify]);
+
+    const removeCustomStage = useCallback((pipeline: string, stageKey: string) => {
+        const updatedCustom: Record<string, string[]> = {
+            ...customStagesByPipeline,
+            [pipeline]: (customStagesByPipeline[pipeline] || []).filter(k => k !== stageKey),
+        };
+        setCustomStagesByPipeline(updatedCustom);
+        localStorage.setItem(CUSTOM_STAGES_KEY, JSON.stringify(updatedCustom));
+
+        // Remove from stageNames
+        const pipelineNames = { ...(stageNamesByPipeline[pipeline] || {}) };
+        delete pipelineNames[stageKey];
+        const updatedNames = { ...stageNamesByPipeline, [pipeline]: pipelineNames };
+        setStageNamesByPipeline(updatedNames);
+        localStorage.setItem(STAGES_KEY, JSON.stringify(updatedNames));
+
+        onNotify?.('success', 'Coluna removida!');
+    }, [customStagesByPipeline, stageNamesByPipeline, onNotify]);
 
     const saveStageNames = (pipeline: string, newNames: Record<string, string>) => {
         const updated = { ...stageNamesByPipeline, [pipeline]: newNames };
@@ -524,6 +567,27 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         }
     };
 
+    useEffect(() => {
+        fetchEvents();
+        fetchTeam();
+        fetchLeads();
+        loadStageNames();
+        loadCustomStages();
+        loadProductLabels();
+
+        // Realtime subscription para leads (Atualização automática sem refresh)
+        const channel = supabase
+            .channel('public:leads')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
+                fetchLeads();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [fetchEvents, fetchTeam, fetchLeads]);
+
     return {
         leads, setLeads,
         events,
@@ -549,5 +613,9 @@ export const useCRM = (onNotify?: (type: 'success' | 'error' | 'info', msg: stri
         deleteSeller,
         refreshLeads: fetchLeads,
         updateLeadSourceTags,
+        // Custom stages
+        getCustomStageKeys,
+        addCustomStage,
+        removeCustomStage,
     };
 };
