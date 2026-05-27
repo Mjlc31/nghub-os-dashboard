@@ -12,7 +12,8 @@ import {
   X,
   Search,
   ChevronRight,
-  Puzzle
+  Puzzle,
+  FileText
 } from 'lucide-react';
 import { NotificationDropdown } from './ui/NotificationDropdown';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { icon: GraduationCap, label: 'Academy', path: '/academy' },
   { icon: DollarSign, label: 'Financeiro', path: '/finance' },
   { icon: MessageSquare, label: 'Conversas', path: '/messaging' },
+  { icon: FileText, label: 'Tarefas', path: '/tasks' },
   { icon: Puzzle, label: 'Integrações', path: '/integrations' },
   { icon: Settings, label: 'Configurações', path: '/settings' },
 ];

@@ -11,6 +11,7 @@ import Finance from './pages/Finance';
 import Conversas from './pages/Conversas';
 import Settings from './pages/Settings';
 import Integrations from './pages/Integrations';
+import Tasks from './pages/Tasks';
 import Toast, { ToastMessage, ToastType } from './components/ui/Toast';
 import { NotificationProvider } from './contexts/NotificationContext';
 
@@ -44,6 +45,7 @@ const App: React.FC = () => {
               <Route path="/academy" element={<Academy />} />
               <Route path="/finance" element={<Finance />} />
               <Route path="/messaging" element={<Conversas onNotify={addToast} />} />
+              <Route path="/tasks" element={<Tasks />} />
               <Route path="/integrations" element={<Integrations />} />
               <Route path="/settings" element={<Settings onNotify={addToast} />} />
             </Route>
