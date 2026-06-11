@@ -12,8 +12,10 @@ import Conversas from './pages/Conversas';
 import Settings from './pages/Settings';
 import Integrations from './pages/Integrations';
 import Tasks from './pages/Tasks';
+import Meeting from './pages/Meeting';
 import Toast, { ToastMessage, ToastType } from './components/ui/Toast';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { AppProvider } from './context/AppContext';
 
 const App: React.FC = () => {
   const [toasts, setToasts] = React.useState<ToastMessage[]>([]);
@@ -31,31 +33,34 @@ const App: React.FC = () => {
   };
 
   return (
-    <BrowserRouter>
-      <NotificationProvider>
-        <Routes>
-          <Route path="/login" element={<Auth onLogin={() => { }} onNotify={addToast} />} />
+    <AppProvider>
+      <BrowserRouter>
+        <NotificationProvider>
+          <Routes>
+            <Route path="/login" element={<Auth onLogin={() => { }} onNotify={addToast} />} />
 
-          <Route element={<RouteGuard />}>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/crm" element={<CRM onNotify={addToast} />} />
-              <Route path="/events" element={<Events onNotify={addToast} />} />
-              <Route path="/academy" element={<Academy />} />
-              <Route path="/finance" element={<Finance />} />
-              <Route path="/messaging" element={<Conversas onNotify={addToast} />} />
-              <Route path="/tasks" element={<Tasks />} />
-              <Route path="/integrations" element={<Integrations />} />
-              <Route path="/settings" element={<Settings onNotify={addToast} />} />
+            <Route element={<RouteGuard />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/crm" element={<CRM onNotify={addToast} />} />
+                <Route path="/events" element={<Events onNotify={addToast} />} />
+                <Route path="/academy" element={<Academy />} />
+                <Route path="/finance" element={<Finance />} />
+                <Route path="/messaging" element={<Conversas onNotify={addToast} />} />
+                <Route path="/tasks" element={<Tasks />} />
+                <Route path="/meeting" element={<Meeting />} />
+                <Route path="/integrations" element={<Integrations />} />
+                <Route path="/settings" element={<Settings onNotify={addToast} />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-        <Toast toasts={toasts} removeToast={removeToast} />
-      </NotificationProvider>
-    </BrowserRouter>
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+          <Toast toasts={toasts} removeToast={removeToast} />
+        </NotificationProvider>
+      </BrowserRouter>
+    </AppProvider>
   );
 };
 

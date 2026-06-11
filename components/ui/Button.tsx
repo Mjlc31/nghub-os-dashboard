@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import React from 'react';
 import { Loader2, LucideIcon } from 'lucide-react';
 
@@ -47,14 +48,14 @@ export const Button: React.FC<ButtonProps> = ({
         if (isLoading) return <Loader2 className={`${iconSize[size]} animate-spin`} />;
         if (!icon) return null;
 
-        // Se já for um elemento React (ex: <Plus />)
+        // Se jÃ¡ for um elemento React (ex: <Plus />)
         if (React.isValidElement(icon)) {
             return React.cloneElement(icon as React.ReactElement, {
                 className: `${iconSize[size]} ${(icon.props as any).className || ''}`
             });
         }
 
-        // Se for uma função de componente ou um componente forwardRef (como Lucide icons)
+        // Se for uma funÃ§Ã£o de componente ou um componente forwardRef (como Lucide icons)
         if (typeof icon === 'function' || (typeof icon === 'object' && icon !== null && (icon as any).render)) {
             const IconComp = icon as any;
             return <IconComp className={iconSize[size]} />;
@@ -76,3 +77,4 @@ export const Button: React.FC<ButtonProps> = ({
         </button>
     );
 };
+

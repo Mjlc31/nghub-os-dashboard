@@ -20,6 +20,7 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { SidebarItem } from './ui/SidebarItem';
 import { useUserProfile } from '../hooks/useUserProfile';
+import { ClipboardList } from 'lucide-react';
 
 // Sidebar Navigation Items
 const NAV_ITEMS = [
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
   { icon: DollarSign, label: 'Financeiro', path: '/finance' },
   { icon: MessageSquare, label: 'Conversas', path: '/messaging' },
   { icon: FileText, label: 'Tarefas', path: '/tasks' },
+  { icon: ClipboardList, label: 'Reunião', path: '/meeting' },
   { icon: Puzzle, label: 'Integrações', path: '/integrations' },
   { icon: Settings, label: 'Configurações', path: '/settings' },
 ];
@@ -53,14 +55,17 @@ const Layout: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
-  const userRole = userProfile?.role || 'admin';
-  const filteredNavItems = NAV_ITEMS.filter(item => {
-    if (userRole === 'pass_student') return item.path === '/academy';
-    if (userRole === 'seller') return item.path !== '/academy';
-    return true; // admin sees all
+  // Usa normalizedRole do hook (lido da tabela profiles)
+  const normalizedRole = userProfile?.normalizedRole ?? 'admin';
+
+  const finalNav = NAV_ITEMS.filter(item => {
+    if (normalizedRole === 'member') {
+      return item.path === '/academy' || item.path === '/meeting' || item.path === '/settings';
+    }
+    if (normalizedRole === 'pass_student') return item.path === '/academy' || item.path === '/settings';
+    if (normalizedRole === 'seller') return item.path !== '/academy' && item.path !== '/meeting';
+    return true; // admin (ADMIN/EQUIPE) vê tudo
   });
-
-
 
   return (
     <div className="min-h-screen bg-brand-dark flex font-sans text-zinc-100 selection:bg-brand-gold/30 selection:text-white overflow-hidden">
@@ -94,7 +99,7 @@ const Layout: React.FC = () => {
         {/* Navigation */}
         <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
           <p className="px-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-4">Menu Principal</p>
-          {filteredNavItems.map((item) => (
+          {finalNav.map((item) => (
             <SidebarItem
               key={item.path}
               item={item}
@@ -106,8 +111,12 @@ const Layout: React.FC = () => {
         {/* User Profile & Logout */}
         <div className="p-4 border-t border-white/5 bg-zinc-900/30">
           <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 mb-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-gold to-[#8a7035] flex items-center justify-center text-black font-bold shadow-lg">
-              {userProfile?.name?.charAt(0) || 'U'}
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-gold to-[#8a7035] flex items-center justify-center text-black font-bold shadow-lg overflow-hidden">
+              {userProfile?.avatar ? (
+                <img src={userProfile?.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                userProfile?.name?.charAt(0) || 'U'
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{userProfile?.name || 'Carregando...'}</p>

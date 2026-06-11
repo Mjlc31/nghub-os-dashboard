@@ -19,6 +19,8 @@ import { Profile } from '../types';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 
+import { useUserProfile } from '../hooks/useUserProfile';
+
 interface SettingsProps {
     onNotify: (type: 'success' | 'error' | 'info', msg: string) => void;
 }
@@ -27,6 +29,8 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
     const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'system'>('profile');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const { userProfile } = useUserProfile();
+    const isAdmin = userProfile?.normalizedRole === 'admin';
 
     // Profile State
     const [profile, setProfile] = useState<Profile>({
@@ -357,8 +361,12 @@ CREATE TRIGGER on_auth_user_created
                 <div className="w-full lg:w-64 flex flex-col gap-1 border-r border-zinc-800/50 pr-0 lg:pr-6">
                     <TabButton id="profile" label="Meu Perfil" icon={User} />
                     <TabButton id="security" label="Segurança" icon={Shield} />
-                    <div className="h-px bg-zinc-800 my-2 mx-4 lg:mx-0"></div>
-                    <TabButton id="system" label="Sistema & Banco" icon={Database} />
+                    {isAdmin && (
+                        <>
+                            <div className="h-px bg-zinc-800 my-2 mx-4 lg:mx-0"></div>
+                            <TabButton id="system" label="Sistema & Banco" icon={Database} />
+                        </>
+                    )}
                 </div>
 
                 {/* Content Area */}
